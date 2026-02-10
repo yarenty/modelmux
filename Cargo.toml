@@ -3,8 +3,8 @@ name = "modelmux"
 version = "0.1.0"
 edition = "2024"
 authors = ["Jaro <yarenty@gmail.com>"]
-description = "High-performance proxy server converting OpenAI API requests to Vertex AI (Anthropic Claude) format"
-license = "MIT"
+description = "ModelMux - High-performance proxy server converting OpenAI API requests to Vertex AI (Anthropic Claude) format"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/yarenty/modelmux"
 homepage = "https://github.com/yarenty/modelmux"
@@ -16,8 +16,18 @@ exclude = [
     "target/*",
     "*.log",
     ".env*",
-    "!.env.example"
+    "!.env.example",
+    "!LICENSE-MIT",
+    "!LICENSE-APACHE"
 ]
+
+[[bin]]
+name = "modelmux"
+path = "src/main.rs"
+
+[lib]
+name = "modelmux"
+path = "src/lib.rs"
 
 [package.metadata.docs.rs]
 all-features = true

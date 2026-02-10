@@ -1,14 +1,81 @@
-//!
-//! Vertex AI to OpenAI Proxy Server - Main Entry Point
+//! # ModelMux - Vertex AI to OpenAI Proxy Server
 //!
 //! A high-performance proxy server that converts OpenAI-compatible API requests
 //! to Vertex AI (Anthropic Claude) format. Built with Rust following SOLID principles
-//! and basebox coding conventions.
+//! for type safety, performance, and reliability.
 //!
-//! Authors:
-//!   Jaro <yarenty@gmail.com>
+//! ## Features
 //!
-//! Copyright (c) 2026 SkyCorp
+//! - **OpenAI-compatible API**: Drop-in replacement for OpenAI API endpoints
+//! - **Tool/Function Calling**: Full support for OpenAI tool calling format
+//! - **Streaming Support**: Server-Sent Events (SSE) streaming responses
+//! - **Smart Client Detection**: Automatically adjusts streaming behavior based on client capabilities
+//! - **Error Handling**: Comprehensive error handling with proper Result types
+//! - **Type Safety**: Leverages Rust's type system for compile-time safety
+//! - **Performance**: Async/await with Tokio for high concurrency
+//! - **Configurable Logging**: Structured logging with tracing
+//!
+//! ## Quick Start
+//!
+//! ```rust,no_run
+//! use modelmux::{Config, create_app};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Load configuration from environment
+//!     let config = Config::from_env()?;
+//!
+//!     // Create the application
+//!     let app = create_app(config).await?;
+//!
+//!     // Start the server
+//!     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+//!     axum::serve(listener, app).await?;
+//!
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Configuration
+//!
+//! Configure the server using environment variables:
+//!
+//! ```bash
+//! # Required: Base64-encoded Google Cloud service account key
+//! export GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
+//!
+//! # Optional: Vertex AI configuration
+//! export LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/..."
+//! export LLM_MODEL="claude-sonnet-4"
+//!
+//! # Optional: Server configuration
+//! export PORT=3000
+//! export LOG_LEVEL=info
+//! export STREAMING_MODE=auto  # auto, non-streaming, standard, buffered
+//! ```
+//!
+//! ## API Usage
+//!
+//! The server provides OpenAI-compatible endpoints:
+//!
+//! ```bash
+//! curl -X POST http://localhost:3000/v1/chat/completions \
+//!   -H "Content-Type: application/json" \
+//!   -d '{
+//!     "model": "claude-sonnet-4",
+//!     "messages": [{"role": "user", "content": "Hello!"}],
+//!     "stream": false
+//!   }'
+//! ```
+//!
+//! ## License
+//!
+//! Licensed under either of Apache License, Version 2.0 or MIT license at your option.
+//!
+//! Authors: Jaro <yarenty@gmail.com>
+//!
+//! Copyright (c) 2024 SkyCorp
+//!
 
 /* --- uses ------------------------------------------------------------------------------------ */
 
@@ -40,7 +107,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /* --- start of code -------------------------------------------------------------------------- */
 
 ///
-/// Main application entry point for the Vertex AI to OpenAI proxy server.
+/// Main application entry point for the ModelMux Vertex AI to OpenAI proxy server.
 ///
 /// Initializes logging, loads configuration from environment variables,
 /// creates the application state, and starts the HTTP server with proper
@@ -164,7 +231,7 @@ async fn start_server(config: &Config, app: Router) -> Result<()> {
 /// # Arguments
 ///  * `config` - application configuration
 fn log_startup_info(config: &Config) {
-    info!("Vertex AI to OpenAI proxy server v{} running on port {}", VERSION, config.port);
+    info!("ModelMux v{} running on port {}", VERSION, config.port);
     info!("Proxy supports tool/function calling for file creation and editing");
     info!("OpenAI-compatible endpoint: http://localhost:{}/v1", config.port);
 

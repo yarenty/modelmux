@@ -1,6 +1,6 @@
-# Vertex AI to OpenAI Proxy (Rust)
+# ModelMux - Vertex AI to OpenAI Proxy (Rust)
 
-A high-performance (Rust) proxy server that converts OpenAI-compatible API requests to Vertex AI (Anthropic Claude) format. 
+A high-performance (Rust) proxy server that converts OpenAI-compatible API requests to Vertex AI (Anthropic Claude) format.
 
 ## Features
 
@@ -169,6 +169,23 @@ modelmux/
 ```
 
 
+## License
+
+Licensed under either of
+
+ * Apache License, Version 2.0
+   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license
+   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+## Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
+
 ## Comparison with Node.js Version
 
 | Feature        | Node.js    | Rust         |
@@ -179,7 +196,3 @@ modelmux/
 | Error Handling | Try/catch  | Result types |
 | Concurrency    | Event loop | Async/await  |
 | Startup Time   | Fast       | Very Fast    |
-
-
-
-
