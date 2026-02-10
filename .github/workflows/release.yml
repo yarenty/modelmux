@@ -35,20 +35,26 @@ jobs:
         run: |
           cargo build --release --target ${{ matrix.target }}
 
-      - name: Package artifact
+      - name: Package artifact (Linux/macOS)
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           BIN_NAME="modelmux"
           TARGET="${{ matrix.target }}"
           OUT_DIR="target/${TARGET}/release"
+          ARCHIVE_NAME="${BIN_NAME}-${TARGET}.tar.gz"
+          (cd "$OUT_DIR" && tar czf "$ARCHIVE_NAME" "$BIN_NAME")
 
-          if [[ "$TARGET" == *"windows"* ]]; then
-            ARCHIVE_NAME="${BIN_NAME}-${TARGET}.zip"
-            (cd "$OUT_DIR" && zip "$ARCHIVE_NAME" "${BIN_NAME}.exe")
-          else
-            ARCHIVE_NAME="${BIN_NAME}-${TARGET}.tar.gz"
-            (cd "$OUT_DIR" && tar czf "$ARCHIVE_NAME" "$BIN_NAME")
-          fi
+      - name: Package artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $BIN_NAME = "modelmux"
+          $TARGET = "${{ matrix.target }}"
+          $OUT_DIR = "target/${TARGET}/release"
+          $ARCHIVE_NAME = "${BIN_NAME}-${TARGET}.zip"
+          $BINARY = "${BIN_NAME}.exe"
+          Compress-Archive -Path "$OUT_DIR\$BINARY" -DestinationPath "$OUT_DIR\$ARCHIVE_NAME" -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
