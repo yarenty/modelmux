@@ -28,7 +28,7 @@ ModelMux - think of it as the nginx for AI models.
 
 ---
 
-## Current Status: v0.1.0
+## Current Status: v0.2.0
 
 ✅ **Production Ready**
 - OpenAI to Vertex AI (Claude) proxy
@@ -36,6 +36,10 @@ ModelMux - think of it as the nginx for AI models.
 - Tool/function calling support
 - Rust Edition 2024 with type safety
 - Comprehensive error handling
+- CLI interface with `--version` and `--help` flags
+- Comprehensive test suite (30+ tests)
+- Homebrew deployment ready
+- Professional packaging structure
 - Dual MIT/Apache licensing
 
 ---
