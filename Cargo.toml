@@ -1,0 +1,51 @@
+[package]
+name = "modelmux"
+version = "0.1.0"
+edition = "2024"
+authors = ["Jaro <yarenty@gmail.com>"]
+description = "ModelMux - Vertex AI to OpenAI proxy server written in Rust"
+license = "MIT"
+
+[dependencies]
+# HTTP server framework
+axum = { version = "0.8", features = ["json", "multipart"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client
+reqwest = { version = "0.13", features = ["json", "stream"] }
+
+# Google Auth
+yup-oauth2 = { version = "12.1", features = ["hyper-rustls"] }
+async-trait = "0.1"
+hyper-util = "0.1"
+
+# Configuration
+dotenvy = "0.15"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Base64 encoding
+base64 = "0.22"
+
+# Time utilities
+chrono = "0.4"
+
+# Async streams
+futures = "0.3"
+tokio-stream = "0.1"
+bytes = "1.11"
+
+[dev-dependencies]
+tokio-test = "0.4"
