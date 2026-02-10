@@ -31,11 +31,8 @@ git push origin main --tags
 # 7. Update Homebrew formula with SHA256
 vim packaging/homebrew/modelmux.rb  # Update sha256 field
 
-# 8. Test Homebrew formula locally
-brew install --build-from-source packaging/homebrew/modelmux.rb
-brew test modelmux
-
-# 9. Submit to Homebrew (see below)
+# 8. Test Homebrew formula locally (use a local tap - see section 7)
+# 9. Publish to your Homebrew tap (see section 8)
 ```
 
 ## Detailed Steps
@@ -100,97 +97,57 @@ sha256 "abc123..."  # Update with actual SHA256 from step 5
 
 ### 7. Test Homebrew Formula Locally
 
-```bash
-# Install from local formula
-brew install --build-from-source packaging/homebrew/modelmux.rb
+Modern Homebrew requires formulae to be in a tap; it will not install from a bare file path. Use a **local tap** to test before publishing.
 
-# Test installed binary
+**One-time setup:** Create a local tap (replace `yarenty` with your GitHub username):
+
+```bash
+brew tap-new yarenty/tap
+```
+
+This creates a directory like `$(brew --prefix)/Library/Taps/yarenty/homebrew-tap/`. You can use it only locally or later push it to GitHub.
+
+**Each time you want to test the formula** (from the modelmux repo root). Use the tap path from brew (bash/zsh):
+
+```bash
+# Create Formula dir if needed, then copy formula into your local tap
+TAP_DIR=$(brew --repository yarenty/tap)
+mkdir -p "$TAP_DIR/Formula"
+cp packaging/homebrew/modelmux.rb "$TAP_DIR/Formula/modelmux.rb"
+
+# Install from the tap (build from source)
+brew install --build-from-source yarenty/tap/modelmux
+
+# Test
 brew test modelmux
 modelmux --version
 modelmux --help
 ```
 
-### 8. Submit to Homebrew
+To re-test after changing the formula, copy again and run `brew reinstall yarenty/tap/modelmux`.
 
-#### Option A: Homebrew Tap (Recommended for first release)
+**Fish shell:** use `set TAP_DIR (brew --repository yarenty/tap)` instead of `TAP_DIR=...`. If you get "Permission denied", the tap path may be under a different prefix; run `brew --repository yarenty/tap` to see the real path and use it.
+
+### 8. Publish to Homebrew tap
+
+Tap repo: **https://github.com/yarenty/homebrew-tap**
+
+**Update formula and push** (after a new release: bump version + SHA256 in `packaging/homebrew/modelmux.rb`, then):
 
 ```bash
-# Create tap repository: homebrew-tap
-# Copy formula
-cp packaging/homebrew/modelmux.rb /path/to/homebrew-tap/Formula/modelmux.rb
-
-# Commit and push
-cd /path/to/homebrew-tap
+TAP_DIR=$(brew --repository yarenty/tap)
+cp packaging/homebrew/modelmux.rb "$TAP_DIR/Formula/modelmux.rb"
+cd "$TAP_DIR"
 git add Formula/modelmux.rb
-git commit -m "Add modelmux formula"
+git commit -m "modelmux 0.x.x"
 git push origin main
 ```
 
-Users install with:
-```bash
-brew tap yarenty/tap
-brew install modelmux
-```
-
-#### Option B: homebrew-core (After tap is established)
-
-```bash
-# Fork homebrew-core
-# Create branch
-git checkout -b modelmux
-
-# Copy formula
-cp packaging/homebrew/modelmux.rb /path/to/homebrew-core/Formula/modelmux.rb
-
-# Commit and push
-git add Formula/modelmux.rb
-git commit -m "Add modelmux formula"
-git push origin modelmux
-
-# Create PR on GitHub
-```
+**Install (for users):** `brew tap yarenty/tap` then `brew install modelmux`
 
 ## Version Numbering
 
-Follow [Semantic Versioning](https://semver.org/):
-- **MAJOR**: Breaking changes
-- **MINOR**: New features (backward compatible)
-- **PATCH**: Bug fixes
-
-Examples:
-- `0.1.0` → `0.1.1` (patch)
-- `0.1.0` → `0.2.0` (minor)
-- `0.1.0` → `1.0.0` (major)
-
-## Troubleshooting
-
-### Homebrew install fails
-
-```bash
-# Check formula syntax
-brew audit --strict packaging/homebrew/modelmux.rb
-
-# Check for issues
-brew doctor
-```
-
-### Tests fail
-
-```bash
-# Run with output
-cargo test -- --nocapture
-
-# Run specific test
-cargo test test_version_flag
-```
-
-### SHA256 mismatch
-
-```bash
-# Re-download tarball and verify
-curl -L -o modelmux-0.1.0.tar.gz https://github.com/yarenty/modelmux/archive/refs/tags/v0.1.0.tar.gz
-shasum -a 256 modelmux-0.1.0.tar.gz
-```
+[Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH (breaking / feature / fix)
 
 ## See Also
 

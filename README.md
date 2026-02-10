@@ -83,6 +83,13 @@ ModelMux is a **high-performance Rust proxy server** that seamlessly converts Op
 
 ## Installation
 
+### Homebrew (macOS)
+
+```bash
+brew tap yarenty/tap
+brew install modelmux
+```
+
 ### Cargo
 
 ```bash
