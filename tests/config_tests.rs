@@ -22,9 +22,8 @@ fn test_missing_required_env_vars() {
     with_vars(
         vec![
             ("GCP_SERVICE_ACCOUNT_KEY", None::<&str>),
-            ("LLM_URL", None::<&str>),
-            ("LLM_CHAT_ENDPOINT", None::<&str>),
-            ("LLM_MODEL", None::<&str>),
+            ("LLM_PREDICT_URL", None::<&str>),
+            ("VERTEX_REGION", None::<&str>),
         ],
         || {
             let result = Config::from_env();
@@ -32,211 +31,166 @@ fn test_missing_required_env_vars() {
             if let Err(e) = result {
                 assert!(
                     format!("{}", e).contains("GCP_SERVICE_ACCOUNT_KEY")
-                        || format!("{}", e).contains("LLM_URL")
-                        || format!("{}", e).contains("LLM_CHAT_ENDPOINT")
-                        || format!("{}", e).contains("LLM_MODEL"),
-                    "Error should mention missing environment variable"
+                        || format!("{}", e).contains("Predict URL not configured")
+                        || format!("{}", e).contains("VERTEX_")
+                        || format!("{}", e).contains("LLM_PREDICT_URL"),
+                    "Error should mention missing configuration"
                 );
             }
         },
     );
 }
 
+fn vertex_test_vars(key_b64: &str) -> Vec<(&'static str, Option<&str>)> {
+    vec![
+        ("GCP_SERVICE_ACCOUNT_KEY", Some(key_b64)),
+        ("LLM_PREDICT_URL", None::<&str>),
+        ("LLM_PROVIDER", Some("vertex")),
+        ("VERTEX_REGION", Some("test-region")),
+        ("VERTEX_PROJECT", Some("test-project")),
+        ("VERTEX_LOCATION", Some("test-region")),
+        ("VERTEX_PUBLISHER", Some("test-publisher")),
+        ("VERTEX_MODEL_ID", Some("test-model")),
+    ]
+}
+
 /// Test that default port is used when PORT is not set
 #[test]
 fn test_default_port() {
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-            ("PORT", None::<&str>),
-        ],
-        || {
-            let config = Config::from_env().expect("Should load config with defaults");
-            assert_eq!(config.port, 3000, "Default port should be 3000");
-        },
-    );
+    let key = get_test_key_b64();
+    let mut vars = vertex_test_vars(&key);
+    vars.push(("PORT", None::<&str>));
+    with_vars(vars, || {
+        let config = Config::from_env().expect("Should load config with defaults");
+        assert_eq!(config.port, 3000, "Default port should be 3000");
+    });
 }
 
 /// Test that custom port is parsed correctly
 #[test]
 fn test_custom_port() {
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-            ("PORT", Some("8080")),
-        ],
-        || {
-            let config = Config::from_env().expect("Should load config");
-            assert_eq!(config.port, 8080, "Should use custom port");
-        },
-    );
+    let key = get_test_key_b64();
+    let mut vars = vertex_test_vars(&key);
+    vars.push(("PORT", Some("8080")));
+    with_vars(vars, || {
+        let config = Config::from_env().expect("Should load config");
+        assert_eq!(config.port, 8080, "Should use custom port");
+    });
 }
 
 /// Test that invalid port produces error
 #[test]
 fn test_invalid_port() {
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-            ("PORT", Some("99999")), // Invalid port number
-        ],
-        || {
-            let result = Config::from_env();
-            assert!(result.is_err(), "Should fail with invalid port");
-        },
-    );
+    let key = get_test_key_b64();
+    let mut vars = vertex_test_vars(&key);
+    vars.push(("PORT", Some("99999"))); // Invalid port number
+    with_vars(vars, || {
+        let result = Config::from_env();
+        assert!(result.is_err(), "Should fail with invalid port");
+    });
 }
 
 /// Test log level parsing
 #[test]
 fn test_log_level_parsing() {
+    let key = get_test_key_b64();
     let levels = vec!["trace", "debug", "info", "warn", "error"];
     for level in levels {
-        with_vars(
-            vec![
-                ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-                ("LLM_URL", Some("https://test.example.com/v1/")),
-                ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-                ("LLM_MODEL", Some("test-model")),
-                ("LOG_LEVEL", Some(level)),
-            ],
-            || {
-                let config = Config::from_env().expect("Should load config");
-                assert_eq!(
-                    format!("{:?}", config.log_level).to_lowercase(),
-                    level,
-                    "Should parse log level correctly"
-                );
-            },
-        );
+        let mut vars = vertex_test_vars(&key);
+        vars.push(("LOG_LEVEL", Some(level)));
+        with_vars(vars, || {
+            let config = Config::from_env().expect("Should load config");
+            assert_eq!(
+                format!("{:?}", config.log_level).to_lowercase(),
+                level,
+                "Should parse log level correctly"
+            );
+        });
     }
 }
 
 /// Test default log level
 #[test]
 fn test_default_log_level() {
-    // Skip this test if .env file exists, as dotenv() will load LOG_LEVEL from it
-    // This test verifies default behavior in clean environments (CI)
     if std::path::Path::new(".env").exists() {
-        eprintln!("Skipping test_default_log_level: .env file exists (dotenv() will load LOG_LEVEL)");
+        eprintln!("Skipping test_default_log_level: .env file exists");
         return;
     }
-
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-            ("LOG_LEVEL", None::<&str>), // Unset to test default
-        ],
-        || {
-            let config = Config::from_env().expect("Should load config");
-            assert_eq!(config.log_level, LogLevel::Info, "Default log level should be Info");
-        },
-    );
+    let key = get_test_key_b64();
+    let mut vars = vertex_test_vars(&key);
+    vars.push(("LOG_LEVEL", None::<&str>));
+    with_vars(vars, || {
+        let config = Config::from_env().expect("Should load config");
+        assert_eq!(config.log_level, LogLevel::Info, "Default log level should be Info");
+    });
 }
 
 /// Test streaming mode parsing
 #[test]
 fn test_streaming_mode_parsing() {
+    let key = get_test_key_b64();
     let modes = vec![
         ("auto", StreamingMode::Auto),
         ("non-streaming", StreamingMode::NonStreaming),
         ("standard", StreamingMode::Standard),
         ("buffered", StreamingMode::Buffered),
     ];
-
     for (mode_str, expected_mode) in modes {
-        with_vars(
-            vec![
-                ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-                ("LLM_URL", Some("https://test.example.com/v1/")),
-                ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-                ("LLM_MODEL", Some("test-model")),
-                ("STREAMING_MODE", Some(mode_str)),
-            ],
-            || {
-                let config = Config::from_env().expect("Should load config");
-                assert_eq!(
-                    config.streaming_mode, expected_mode,
-                    "Should parse streaming mode '{}' correctly",
-                    mode_str
-                );
-            },
-        );
+        let mut vars = vertex_test_vars(&key);
+        vars.push(("STREAMING_MODE", Some(mode_str)));
+        with_vars(vars, || {
+            let config = Config::from_env().expect("Should load config");
+            assert_eq!(
+                config.streaming_mode, expected_mode,
+                "Should parse streaming mode '{}' correctly",
+                mode_str
+            );
+        });
     }
 }
 
 /// Test default streaming mode
 #[test]
 fn test_default_streaming_mode() {
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-            ("STREAMING_MODE", None::<&str>),
-        ],
-        || {
-            let config = Config::from_env().expect("Should load config");
-            assert_eq!(
-                config.streaming_mode,
-                StreamingMode::Auto,
-                "Default streaming mode should be Auto"
-            );
-        },
-    );
+    let key = get_test_key_b64();
+    let mut vars = vertex_test_vars(&key);
+    vars.push(("STREAMING_MODE", None::<&str>));
+    with_vars(vars, || {
+        let config = Config::from_env().expect("Should load config");
+        assert_eq!(
+            config.streaming_mode,
+            StreamingMode::Auto,
+            "Default streaming mode should be Auto"
+        );
+    });
 }
 
 /// Test retry configuration parsing
 #[test]
 fn test_retry_config() {
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-            ("ENABLE_RETRIES", Some("false")),
-            ("MAX_RETRY_ATTEMPTS", Some("5")),
-        ],
-        || {
-            let config = Config::from_env().expect("Should load config");
-            assert_eq!(config.enable_retries, false, "Should parse enable_retries");
-            assert_eq!(config.max_retry_attempts, 5, "Should parse max_retry_attempts");
-        },
-    );
+    let key = get_test_key_b64();
+    let mut vars = vertex_test_vars(&key);
+    vars.push(("ENABLE_RETRIES", Some("false")));
+    vars.push(("MAX_RETRY_ATTEMPTS", Some("5")));
+    with_vars(vars, || {
+        let config = Config::from_env().expect("Should load config");
+        assert_eq!(config.enable_retries, false, "Should parse enable_retries");
+        assert_eq!(config.max_retry_attempts, 5, "Should parse max_retry_attempts");
+    });
 }
 
 /// Test default retry configuration
 #[test]
 fn test_default_retry_config() {
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-            ("ENABLE_RETRIES", None::<&str>),
-            ("MAX_RETRY_ATTEMPTS", None::<&str>),
-        ],
-        || {
-            let config = Config::from_env().expect("Should load config");
-            assert_eq!(config.enable_retries, true, "Default enable_retries should be true");
-            assert_eq!(config.max_retry_attempts, 3, "Default max_retry_attempts should be 3");
-        },
-    );
+    let key = get_test_key_b64();
+    let mut vars = vertex_test_vars(&key);
+    vars.push(("ENABLE_RETRIES", None::<&str>));
+    vars.push(("MAX_RETRY_ATTEMPTS", None::<&str>));
+    with_vars(vars, || {
+        let config = Config::from_env().expect("Should load config");
+        assert_eq!(config.enable_retries, true, "Default enable_retries should be true");
+        assert_eq!(config.max_retry_attempts, 3, "Default max_retry_attempts should be 3");
+    });
 }
 
 /// Test LogLevel::is_trace_enabled
@@ -276,34 +230,27 @@ fn test_log_level_from_str() {
     assert_eq!(LogLevel::from("unknown"), LogLevel::Info); // Default
 }
 
-/// Test build_vertex_url method
+/// Test build_predict_url (Vertex vars)
 #[test]
-fn test_build_vertex_url() {
-    with_vars(
-        vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", Some(get_test_key_b64().as_str())),
-            ("LLM_URL", Some("https://test.example.com/v1/")),
-            ("LLM_CHAT_ENDPOINT", Some("test-model:streamRawPredict")),
-            ("LLM_MODEL", Some("test-model")),
-        ],
-        || {
-            let config = Config::from_env().expect("Should load config");
-
-            // Test streaming URL
-            let streaming_url = config.build_vertex_url(true);
-            assert!(
-                streaming_url.contains("streamRawPredict"),
-                "Streaming URL should contain streamRawPredict"
-            );
-
-            // Test non-streaming URL
-            let non_streaming_url = config.build_vertex_url(false);
-            assert!(
-                non_streaming_url.contains("rawPredict"),
-                "Non-streaming URL should contain rawPredict"
-            );
-        },
-    );
+fn test_build_predict_url() {
+    let key = get_test_key_b64();
+    with_vars(vertex_test_vars(&key), || {
+        let config = Config::from_env().expect("Should load config");
+        let streaming_url = config.build_predict_url(true);
+        assert!(
+            streaming_url.contains("streamRawPredict"),
+            "Streaming URL should contain streamRawPredict"
+        );
+        let non_streaming_url = config.build_predict_url(false);
+        assert!(
+            non_streaming_url.contains("rawPredict"),
+            "Non-streaming URL should contain rawPredict"
+        );
+        assert!(
+            config.build_predict_url(false).contains("test-region-aiplatform.googleapis.com"),
+            "URL should be built from Vertex vars"
+        );
+    });
 }
 
 /// Helper function to get base64-encoded test service account key

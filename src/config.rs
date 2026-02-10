@@ -16,24 +16,19 @@ use std::env;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{ProxyError, Result};
+use crate::provider::{AuthStrategy, LlmProviderBackend, LlmProviderConfig};
 
 /* --- types ----------------------------------------------------------------------------------- */
 
 ///
 /// Application configuration structure.
 ///
-/// Contains all runtime configuration options loaded from environment variables.
-/// Provides methods for loading and validating configuration settings.
+/// Provider is selected by `LLM_PROVIDER`; only the matching backend is loaded
+/// (Vertex: full URL or VERTEX_* structure; others: provider-specific vars).
 #[derive(Debug, Clone)]
 pub struct Config {
-    /** the base URL for Vertex AI API endpoints */
-    pub llm_url: String,
-    /** the specific chat endpoint path for LLM requests */
-    pub llm_chat_endpoint: String,
-    /** the LLM model identifier */
-    pub llm_model: String,
-    /** Google Cloud service account credentials */
-    pub service_account_key: ServiceAccountKey,
+    /** LLM backend provider (vertex, openai_compatible, etc.) */
+    pub llm_provider: LlmProviderConfig,
     /** HTTP server port number */
     pub port: u16,
     /** application logging level */
@@ -210,10 +205,7 @@ impl Config {
     pub fn from_env() -> Result<Self> {
         let _ = dotenvy::dotenv();
 
-        let service_account_key = Self::load_service_account_key()?;
-        let llm_url = Self::get_llm_url()?;
-        let llm_chat_endpoint = Self::get_llm_chat_endpoint()?;
-        let llm_model = Self::get_llm_model()?;
+        let llm_provider = LlmProviderConfig::from_env()?;
         let port = Self::get_port()?;
         let log_level = Self::get_log_level();
         let enable_retries = Self::get_enable_retries();
@@ -221,10 +213,7 @@ impl Config {
         let streaming_mode = Self::get_streaming_mode();
 
         Ok(Config {
-            llm_url,
-            llm_chat_endpoint,
-            llm_model,
-            service_account_key,
+            llm_provider,
             port,
             log_level,
             enable_retries,
@@ -234,25 +223,15 @@ impl Config {
     }
 
     ///
-    /// Build the full Vertex AI URL for a request.
-    ///
-    /// Constructs the complete URL by combining the base URL with the chat endpoint,
-    /// adjusting the endpoint based on whether streaming is requested.
-    ///
-    /// # Arguments
-    ///  * `is_streaming` - whether this is for a streaming request
-    ///
-    /// # Returns
-    ///  * Complete URL string for the Vertex AI endpoint
-    pub fn build_vertex_url(&self, is_streaming: bool) -> String {
-        let endpoint = if is_streaming { "streamRawPredict" } else { "rawPredict" };
+    /// Build the full request URL for the configured provider (streaming or not).
+    pub fn build_predict_url(&self, is_streaming: bool) -> String {
+        self.llm_provider.build_request_url(is_streaming)
+    }
 
-        let chat_endpoint = self
-            .llm_chat_endpoint
-            .replace(":streamRawPredict", &format!(":{}", endpoint))
-            .replace(":rawPredict", &format!(":{}", endpoint));
-
-        format!("{}{}", self.llm_url, chat_endpoint)
+    ///
+    /// Display model name for OpenAI-compatible API responses.
+    pub fn llm_model(&self) -> &str {
+        self.llm_provider.display_model_name()
     }
 
     ///
@@ -264,7 +243,7 @@ impl Config {
     /// # Returns
     ///  * Decoded service account key structure
     ///  * `ProxyError::Config` if key is missing, invalid, or malformed
-    fn load_service_account_key() -> Result<ServiceAccountKey> {
+    pub fn load_service_account_key_standalone() -> Result<ServiceAccountKey> {
         let service_account_key_b64 = env::var("GCP_SERVICE_ACCOUNT_KEY").map_err(|_| {
             ProxyError::Config(
                 "GCP_SERVICE_ACCOUNT_KEY environment variable is not set.\n\
@@ -283,77 +262,6 @@ impl Config {
         })?;
 
         Self::decode_service_account_key(&service_account_key_b64)
-    }
-
-    ///
-    /// Get the LLM base URL from environment.
-    ///
-    /// # Returns
-    ///  * LLM base URL string
-    ///  * `ProxyError::Config` if LLM_URL is not set
-    fn get_llm_url() -> Result<String> {
-        env::var("LLM_URL").map_err(|_| {
-            ProxyError::Config(
-                "LLM_URL environment variable is not set.\n\
-         \n\
-         To fix this:\n\
-           1. Get your Vertex AI endpoint URL from Google Cloud Console\n\
-           2. Format: https://REGION-aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/publishers/\n\
-           3. Set the environment variable:\n\
-              export LLM_URL=\"https://your-region-aiplatform.googleapis.com/v1/projects/your-project/locations/your-location/publishers/\"\n\
-           4. Or add it to a .env file\n\
-         \n\
-         Run 'modelmux doctor' for more help."
-                    .to_string(),
-            )
-        })
-    }
-
-    ///
-    /// Get the LLM chat endpoint from environment.
-    ///
-    /// # Returns
-    ///  * LLM chat endpoint string
-    ///  * `ProxyError::Config` if LLM_CHAT_ENDPOINT is not set
-    fn get_llm_chat_endpoint() -> Result<String> {
-        env::var("LLM_CHAT_ENDPOINT").map_err(|_| {
-            ProxyError::Config(
-                "LLM_CHAT_ENDPOINT environment variable is not set.\n\
-         \n\
-         To fix this:\n\
-           1. Format: MODEL_NAME:streamRawPredict or MODEL_NAME:rawPredict\n\
-           2. Example: claude-sonnet-4:streamRawPredict\n\
-           3. Set the environment variable:\n\
-              export LLM_CHAT_ENDPOINT=\"your-model:streamRawPredict\"\n\
-           4. Or add it to a .env file\n\
-         \n\
-         Run 'modelmux doctor' for more help."
-                    .to_string(),
-            )
-        })
-    }
-
-    ///
-    /// Get the LLM model identifier from environment.
-    ///
-    /// # Returns
-    ///  * LLM model identifier string
-    ///  * `ProxyError::Config` if LLM_MODEL is not set
-    fn get_llm_model() -> Result<String> {
-        env::var("LLM_MODEL").map_err(|_| {
-            ProxyError::Config(
-                "LLM_MODEL environment variable is not set.\n\
-         \n\
-         To fix this:\n\
-           1. Set the model identifier (e.g., claude-sonnet-4)\n\
-           2. Set the environment variable:\n\
-              export LLM_MODEL=\"claude-sonnet-4\"\n\
-           3. Or add it to a .env file\n\
-         \n\
-         Run 'modelmux doctor' for more help."
-                    .to_string(),
-            )
-        })
     }
 
     ///
@@ -486,51 +394,46 @@ impl Config {
     pub fn validate(&self) -> Vec<ValidationIssue> {
         let mut issues = Vec::new();
 
-        // Validate service account key structure
-        if self.service_account_key.private_key.is_empty() {
-            issues.push(ValidationIssue {
-                field: "GCP_SERVICE_ACCOUNT_KEY".to_string(),
-                severity: ValidationSeverity::Error,
-                message: "Service account key private_key is empty".to_string(),
-                suggestion: Some("Ensure your service account key JSON contains a valid private_key field".to_string()),
-            });
+        match &self.llm_provider.auth_strategy() {
+            AuthStrategy::GcpOAuth2(key) => {
+                if key.private_key.is_empty() {
+                    issues.push(ValidationIssue {
+                        field: "GCP_SERVICE_ACCOUNT_KEY".to_string(),
+                        severity: ValidationSeverity::Error,
+                        message: "Service account key private_key is empty".to_string(),
+                        suggestion: Some("Ensure your service account key JSON contains a valid private_key field".to_string()),
+                    });
+                }
+                if !key.client_email.contains('@') {
+                    issues.push(ValidationIssue {
+                        field: "GCP_SERVICE_ACCOUNT_KEY".to_string(),
+                        severity: ValidationSeverity::Error,
+                        message: format!("Invalid client_email format: {}", key.client_email),
+                        suggestion: Some("Service account email should be in format: name@project-id.iam.gserviceaccount.com".to_string()),
+                    });
+                }
+            }
+            AuthStrategy::BearerToken(_) => {}
         }
 
-        if !self.service_account_key.client_email.contains('@') {
+        let request_url = self.llm_provider.build_request_url(false);
+        if !request_url.starts_with("https://") {
             issues.push(ValidationIssue {
-                field: "GCP_SERVICE_ACCOUNT_KEY".to_string(),
-                severity: ValidationSeverity::Error,
-                message: format!("Invalid client_email format: {}", self.service_account_key.client_email),
-                suggestion: Some("Service account email should be in format: name@project-id.iam.gserviceaccount.com".to_string()),
-            });
-        }
-
-        // Validate URLs
-        if !self.llm_url.starts_with("https://") {
-            issues.push(ValidationIssue {
-                field: "LLM_URL".to_string(),
+                field: "request_url".to_string(),
                 severity: ValidationSeverity::Warning,
-                message: format!("LLM_URL should use HTTPS: {}", self.llm_url),
+                message: format!("Request URL should use HTTPS: {}", request_url),
                 suggestion: Some("Use https:// for secure connections".to_string()),
             });
         }
-
-        if !self.llm_url.contains("aiplatform.googleapis.com") {
+        if self.llm_provider.id() == "vertex"
+            && !request_url.contains("aiplatform.googleapis.com")
+            && !request_url.contains("/publishers/")
+        {
             issues.push(ValidationIssue {
-                field: "LLM_URL".to_string(),
-                severity: ValidationSeverity::Warning,
-                message: format!("LLM_URL doesn't appear to be a Vertex AI URL: {}", self.llm_url),
-                suggestion: Some("Verify this is the correct Vertex AI endpoint URL".to_string()),
-            });
-        }
-
-        // Validate endpoint format
-        if !self.llm_chat_endpoint.contains(':') {
-            issues.push(ValidationIssue {
-                field: "LLM_CHAT_ENDPOINT".to_string(),
-                severity: ValidationSeverity::Warning,
-                message: format!("LLM_CHAT_ENDPOINT should include model name and method: {}", self.llm_chat_endpoint),
-                suggestion: Some("Format should be: model-name:streamRawPredict or model-name:rawPredict".to_string()),
+                field: "request_url".to_string(),
+                severity: ValidationSeverity::Info,
+                message: "URL doesn't look like Vertex AI (no aiplatform.googleapis.com or /publishers/)".to_string(),
+                suggestion: Some("Expected: .../publishers/{publisher}/models/{model}".to_string()),
             });
         }
 

@@ -44,15 +44,17 @@
 //! # Required: Base64-encoded Google Cloud service account key
 //! export GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
 //!
-//! # Required: Vertex AI configuration
-//! export LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/..."
-//! export LLM_CHAT_ENDPOINT="your-chat-endpoint"
-//! export LLM_MODEL="claude-sonnet-4"
+//! # Predict URL: use LLM_PREDICT_URL (full resource URL) or Vertex vars
+//! export LLM_PROVIDER=vertex
+//! export VERTEX_REGION=europe-west1
+//! export VERTEX_PROJECT=my-project
+//! export VERTEX_LOCATION=europe-west1
+//! export VERTEX_PUBLISHER=anthropic
+//! export VERTEX_MODEL_ID=claude-sonnet-4@20250514
 //!
-//! # Optional: Server configuration
 //! export PORT=3000
 //! export LOG_LEVEL=info
-//! export STREAMING_MODE=auto  # auto, non-streaming, standard, buffered
+//! export STREAMING_MODE=auto
 //! ```
 //!
 //! ## API Usage
@@ -100,6 +102,7 @@ mod auth;
 mod config;
 mod converter;
 mod error;
+mod provider;
 mod server;
 
 /* --- constants ------------------------------------------------------------------------------ */
@@ -219,15 +222,22 @@ fn print_help() {
     println!(
         "    GCP_SERVICE_ACCOUNT_KEY    Base64-encoded Google Cloud service account key (required)"
     );
-    println!("    LLM_URL                    Vertex AI base URL (required)");
-    println!("    LLM_CHAT_ENDPOINT         Chat endpoint path (required)");
-    println!("    LLM_MODEL                 Model identifier (required)");
-    println!("    PORT                      Server port (default: 3000)");
+    println!();
+    println!("    Predict URL (use one of the following):");
+    println!("    LLM_PREDICT_URL             Full resource URL (no :rawPredict/:streamRawPredict suffix)");
+    println!("    -- or Vertex (LLM_PROVIDER=vertex):");
+    println!("    VERTEX_REGION               e.g. europe-west1");
+    println!("    VERTEX_PROJECT              GCP project ID");
+    println!("    VERTEX_LOCATION             e.g. europe-west1");
+    println!("    VERTEX_PUBLISHER            e.g. anthropic");
+    println!("    VERTEX_MODEL_ID             e.g. claude-sonnet-4@20250514");
+    println!("    LLM_MODEL_DISPLAY_NAME      Optional; else derived from model id");
+    println!("    PORT                       Server port (default: 3000)");
     println!(
-        "    LOG_LEVEL                 Log level: trace, debug, info, warn, error (default: info)"
+        "    LOG_LEVEL                  Log level: trace, debug, info, warn, error (default: info)"
     );
     println!(
-        "    STREAMING_MODE            Streaming mode: auto, non-streaming, standard, buffered (default: auto)"
+        "    STREAMING_MODE             Streaming mode: auto, non-streaming, standard, buffered (default: auto)"
     );
     println!();
     println!("EXAMPLES:");
@@ -256,40 +266,6 @@ fn run_doctor() {
         println!("[OK] Found .env file");
     } else {
         println!("[INFO] No .env file found (using environment variables)");
-    }
-    println!();
-
-    // Check required environment variables
-    println!("Checking Required Environment Variables:");
-    let required_vars = vec![
-        "GCP_SERVICE_ACCOUNT_KEY",
-        "LLM_URL",
-        "LLM_CHAT_ENDPOINT",
-        "LLM_MODEL",
-    ];
-
-    let mut missing_vars = Vec::new();
-    for var in &required_vars {
-        match std::env::var(var) {
-            Ok(val) => {
-                if val.is_empty() {
-                    println!("  [ERROR] {}: Set but empty", var);
-                    missing_vars.push(var);
-                } else {
-                    // Mask sensitive values
-                    let display_val = if *var == "GCP_SERVICE_ACCOUNT_KEY" {
-                        format!("{}... ({} chars)", &val[..val.len().min(20)], val.len())
-                    } else {
-                        val
-                    };
-                    println!("  [OK] {}: {}", var, display_val);
-                }
-            }
-            Err(_) => {
-                println!("  [ERROR] {}: Not set", var);
-                missing_vars.push(var);
-            }
-        }
     }
     println!();
 
@@ -354,15 +330,10 @@ fn run_doctor() {
             println!("  [ERROR] Failed to load configuration:");
             println!("     {}", e);
             println!();
-            if !missing_vars.is_empty() {
-                println!("Suggestions:");
-                println!("   1. Set missing environment variables:");
-                for var in &missing_vars {
-                    println!("      export {}=\"your-value\"", var);
-                }
-                println!("   2. Or create a .env file with these variables");
-                println!("   3. Run 'modelmux doctor' again to verify");
-            }
+            println!("Suggestions:");
+            println!("   • Use either LLM_PREDICT_URL (full resource URL) or Vertex vars (VERTEX_REGION, VERTEX_PROJECT, etc.)");
+            println!("   • Ensure GCP_SERVICE_ACCOUNT_KEY is set (base64-encoded JSON key)");
+            println!("   • Run 'modelmux --help' for full environment variable reference");
         }
     }
 }

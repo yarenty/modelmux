@@ -47,21 +47,26 @@ async fn test_create_app_handles_invalid_config() {
 
 /// Helper function to create test configuration
 fn create_test_config() -> Config {
+    use modelmux::provider::{AuthStrategy, LlmProviderConfig, VertexProvider};
+
+    let service_account_key = ServiceAccountKey {
+        project_id: "test-project".to_string(),
+        private_key_id: "test-key-id".to_string(),
+        private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----\n".to_string(),
+        client_email: "test@test-project.iam.gserviceaccount.com".to_string(),
+        client_id: "123456789".to_string(),
+        auth_uri: "https://accounts.google.com/o/oauth2/auth".to_string(),
+        token_uri: "https://oauth2.googleapis.com/token".to_string(),
+        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs".to_string(),
+        client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com".to_string(),
+    };
+    let vertex = VertexProvider {
+        predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
+        display_model: "test-model".to_string(),
+        auth: AuthStrategy::GcpOAuth2(service_account_key),
+    };
     Config {
-        llm_url: "https://test.example.com/v1/".to_string(),
-        llm_chat_endpoint: "test-model:streamRawPredict".to_string(),
-        llm_model: "test-model".to_string(),
-        service_account_key: ServiceAccountKey {
-            project_id: "test-project".to_string(),
-            private_key_id: "test-key-id".to_string(),
-            private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----\n".to_string(),
-            client_email: "test@test-project.iam.gserviceaccount.com".to_string(),
-            client_id: "123456789".to_string(),
-            auth_uri: "https://accounts.google.com/o/oauth2/auth".to_string(),
-            token_uri: "https://oauth2.googleapis.com/token".to_string(),
-            auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs".to_string(),
-            client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com".to_string(),
-        },
+        llm_provider: LlmProviderConfig::Vertex(vertex),
         port: 3000,
         log_level: LogLevel::Info,
         enable_retries: true,

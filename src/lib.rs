@@ -28,7 +28,8 @@
 //! ## Modules
 //!
 //! - [`config`] - Configuration management and environment variable handling
-//! - [`auth`] - Google Cloud authentication for Vertex AI
+//! - [`provider`] - LLM backend abstraction ([`LlmProviderBackend`]); Vertex and OpenAI-compatible (stub)
+//! - [`auth`] - Request auth (GCP OAuth2 or Bearer token)
 //! - [`server`] - HTTP server setup and route handlers
 //! - [`converter`] - Format conversion between OpenAI and Anthropic formats
 //! - [`error`] - Error types and handling
@@ -37,6 +38,7 @@ pub mod auth;
 pub mod config;
 pub mod converter;
 pub mod error;
+pub mod provider;
 pub mod server;
 
 // Re-export commonly used types

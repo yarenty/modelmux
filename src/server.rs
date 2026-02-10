@@ -27,8 +27,9 @@ use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::auth::GcpAuthProvider;
+use crate::auth::RequestAuth;
 use crate::config::Config;
+use crate::provider::LlmProviderBackend;
 use crate::converter::{AnthropicToOpenAiConverter, OpenAiToAnthropicConverter};
 use crate::error::{ProxyError, Result};
 
@@ -42,8 +43,8 @@ use crate::error::{ProxyError, Result};
 pub struct AppState {
     /** application configuration */
     pub config: Config,
-    /** authentication provider for GCP access */
-    pub auth_provider: Arc<GcpAuthProvider>,
+    /** auth for outgoing LLM requests (GCP OAuth2 or Bearer) */
+    pub request_auth: RequestAuth,
     /** HTTP client for external requests */
     pub http_client: Client,
     /** converter from OpenAI to Anthropic format */
@@ -109,9 +110,6 @@ const CONTENT_TYPE_JSON: &str = "application/json";
 /** Authorization header name */
 const AUTHORIZATION_HEADER: &str = "Authorization";
 
-/** Bearer token prefix */
-const BEARER_PREFIX: &str = "Bearer ";
-
 /** Base delay in seconds for exponential backoff */
 const BASE_RETRY_DELAY_SECS: u64 = 1;
 
@@ -134,7 +132,8 @@ impl AppState {
     ///  * Application state with initialized dependencies
     ///  * `ProxyError` if initialization fails
     pub async fn new(config: Config) -> Result<Self> {
-        let auth_provider = Arc::new(GcpAuthProvider::new(&config.service_account_key).await?);
+        let request_auth =
+            RequestAuth::from_strategy(config.llm_provider.auth_strategy()).await?;
         let http_client = Self::create_http_client()?;
         let openai_to_anthropic = OpenAiToAnthropicConverter::new(config.log_level);
         let anthropic_to_openai = AnthropicToOpenAiConverter::new(config.log_level);
@@ -142,7 +141,7 @@ impl AppState {
 
         Ok(Self {
             config,
-            auth_provider,
+            request_auth,
             http_client,
             openai_to_anthropic,
             anthropic_to_openai,
@@ -249,9 +248,9 @@ async fn process_chat_completion(
     log_incoming_request(&state, &openai_request);
 
     let anthropic_request = convert_to_anthropic(state.clone(), openai_request)?;
-    let access_token = get_access_token(state.clone()).await?;
+    let auth_header = get_authorization_header(state.clone()).await?;
     let vertex_response =
-        make_vertex_request_with_retry(state.clone(), &anthropic_request, &access_token).await?;
+        make_vertex_request_with_retry(state.clone(), &anthropic_request, &auth_header).await?;
 
     if anthropic_request.stream {
         if should_use_buffered_streaming {
@@ -328,8 +327,8 @@ fn convert_to_anthropic(
 /// # Returns
 ///  * Valid access token
 ///  * `ProxyError::Auth` if token retrieval fails
-async fn get_access_token(state: Arc<AppState>) -> Result<String> {
-    state.auth_provider.get_access_token().await
+async fn get_authorization_header(state: Arc<AppState>) -> Result<String> {
+    state.request_auth.authorization_header_value().await
 }
 
 ///
@@ -338,7 +337,7 @@ async fn get_access_token(state: Arc<AppState>) -> Result<String> {
 /// # Arguments
 ///  * `state` - application state with HTTP client and config
 ///  * `anthropic_request` - request to send
-///  * `access_token` - authentication token
+///  * `auth_header` - full Authorization header value
 ///
 /// # Returns
 ///  * HTTP response from Vertex AI
@@ -346,17 +345,17 @@ async fn get_access_token(state: Arc<AppState>) -> Result<String> {
 async fn make_vertex_request_with_retry(
     state: Arc<AppState>,
     anthropic_request: &crate::converter::openai_to_anthropic::AnthropicRequest,
-    access_token: &str,
+    auth_header: &str,
 ) -> Result<reqwest::Response> {
     if !state.config.enable_retries {
-        return make_vertex_request(state, anthropic_request, access_token).await;
+        return make_vertex_request(state, anthropic_request, auth_header).await;
     }
 
     let mut attempts = 0;
 
     loop {
         attempts += 1;
-        let response = make_vertex_request(state.clone(), anthropic_request, access_token).await;
+        let response = make_vertex_request(state.clone(), anthropic_request, auth_header).await;
 
         match response {
             Ok(resp) => return Ok(resp),
@@ -399,14 +398,14 @@ async fn make_vertex_request_with_retry(
 async fn make_vertex_request(
     state: Arc<AppState>,
     anthropic_request: &crate::converter::openai_to_anthropic::AnthropicRequest,
-    access_token: &str,
+    auth_header: &str,
 ) -> Result<reqwest::Response> {
-    let url = state.config.build_vertex_url(anthropic_request.stream);
+    let url = state.config.build_predict_url(anthropic_request.stream);
 
     let response = state
         .http_client
         .post(&url)
-        .header(AUTHORIZATION_HEADER, format!("{}{}", BEARER_PREFIX, access_token))
+        .header(AUTHORIZATION_HEADER, auth_header)
         .header("Content-Type", CONTENT_TYPE_JSON)
         .json(anthropic_request)
         .send()
@@ -495,7 +494,7 @@ async fn handle_non_streaming_response(
     log_anthropic_response(&state, &anthropic_response);
 
     let openai_response =
-        state.anthropic_to_openai.convert(anthropic_response, &state.config.llm_model);
+        state.anthropic_to_openai.convert(anthropic_response, state.config.llm_model());
 
     log_openai_response(&state, &openai_response);
 
@@ -575,7 +574,7 @@ async fn handle_streaming_response(
 
     let (tx, rx) = mpsc::channel::<Result<Event>>(STREAMING_CHANNEL_BUFFER);
     let state_clone = state.clone();
-    let model = state.config.llm_model.clone();
+    let model = state.config.llm_model().to_string();
 
     tokio::spawn(async move {
         process_streaming_events(response, state_clone, model, tx).await;
@@ -797,7 +796,7 @@ async fn handle_buffered_streaming_response(
 
     let (tx, rx) = mpsc::channel::<Result<Event>>(STREAMING_CHANNEL_BUFFER);
     let state_clone = state.clone();
-    let model = state.config.llm_model.clone();
+    let model = state.config.llm_model().to_string();
 
     tokio::spawn(async move {
         process_buffered_streaming_events(response, state_clone, model, tx).await;
@@ -1017,7 +1016,7 @@ async fn handle_goose_request(
     let anthropic_request = state.openai_to_anthropic.convert(openai_request)?;
 
     // Get access token
-    let access_token = get_access_token(state.clone()).await?;
+    let auth_header = get_authorization_header(state.clone()).await?;
 
     // Make non-streaming request to Vertex AI
     let mut anthropic_request_non_streaming = anthropic_request;
@@ -1026,7 +1025,7 @@ async fn handle_goose_request(
     let vertex_response = make_vertex_request_with_retry(
         state.clone(),
         &anthropic_request_non_streaming,
-        &access_token,
+        &auth_header,
     )
     .await?;
 
@@ -1036,7 +1035,7 @@ async fn handle_goose_request(
 
     // Convert to OpenAI format
     let openai_response =
-        state.anthropic_to_openai.convert(anthropic_response, &state.config.llm_model);
+        state.anthropic_to_openai.convert(anthropic_response, state.config.llm_model());
 
     // Create SSE response with complete content
     let (tx, rx) = mpsc::channel::<Result<Event>>(STREAMING_CHANNEL_BUFFER);
@@ -1322,7 +1321,7 @@ pub async fn models(State(state): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({
       "object": "list",
       "data": [{
-        "id": state.config.llm_model,
+        "id": state.config.llm_model(),
         "object": "model",
         "created": chrono::Utc::now().timestamp_millis(),
         "owned_by": "anthropic"
@@ -1369,6 +1368,7 @@ mod tests {
     use axum::http::HeaderValue;
 
     use super::*;
+    use crate::provider::{AuthStrategy, LlmProviderConfig, VertexProvider};
 
     #[test]
     fn test_detect_buffered_streaming_client_rustrover() {
@@ -1450,21 +1450,24 @@ mod tests {
     fn test_determine_streaming_behavior_auto_mode() {
         use crate::config::{Config, LogLevel, ServiceAccountKey, StreamingMode};
 
+        let service_account_key = ServiceAccountKey {
+            project_id: "test".to_string(),
+            private_key_id: "test".to_string(),
+            private_key: "test".to_string(),
+            client_email: "test".to_string(),
+            client_id: "test".to_string(),
+            auth_uri: "test".to_string(),
+            token_uri: "test".to_string(),
+            auth_provider_x509_cert_url: "test".to_string(),
+            client_x509_cert_url: "test".to_string(),
+        };
+        let vertex = VertexProvider {
+            predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
+            display_model: "test".to_string(),
+            auth: AuthStrategy::GcpOAuth2(service_account_key),
+        };
         let config = Config {
-            llm_url: "test".to_string(),
-            llm_chat_endpoint: "test".to_string(),
-            llm_model: "test".to_string(),
-            service_account_key: ServiceAccountKey {
-                project_id: "test".to_string(),
-                private_key_id: "test".to_string(),
-                private_key: "test".to_string(),
-                client_email: "test".to_string(),
-                client_id: "test".to_string(),
-                auth_uri: "test".to_string(),
-                token_uri: "test".to_string(),
-                auth_provider_x509_cert_url: "test".to_string(),
-                client_x509_cert_url: "test".to_string(),
-            },
+            llm_provider: LlmProviderConfig::Vertex(vertex),
             port: 3000,
             log_level: LogLevel::Info,
             enable_retries: true,
@@ -1499,21 +1502,24 @@ mod tests {
     fn test_determine_streaming_behavior_non_streaming_mode() {
         use crate::config::{Config, LogLevel, ServiceAccountKey, StreamingMode};
 
+        let service_account_key = ServiceAccountKey {
+            project_id: "test".to_string(),
+            private_key_id: "test".to_string(),
+            private_key: "test".to_string(),
+            client_email: "test".to_string(),
+            client_id: "test".to_string(),
+            auth_uri: "test".to_string(),
+            token_uri: "test".to_string(),
+            auth_provider_x509_cert_url: "test".to_string(),
+            client_x509_cert_url: "test".to_string(),
+        };
+        let vertex = VertexProvider {
+            predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
+            display_model: "test".to_string(),
+            auth: AuthStrategy::GcpOAuth2(service_account_key),
+        };
         let config = Config {
-            llm_url: "test".to_string(),
-            llm_chat_endpoint: "test".to_string(),
-            llm_model: "test".to_string(),
-            service_account_key: ServiceAccountKey {
-                project_id: "test".to_string(),
-                private_key_id: "test".to_string(),
-                private_key: "test".to_string(),
-                client_email: "test".to_string(),
-                client_id: "test".to_string(),
-                auth_uri: "test".to_string(),
-                token_uri: "test".to_string(),
-                auth_provider_x509_cert_url: "test".to_string(),
-                client_x509_cert_url: "test".to_string(),
-            },
+            llm_provider: LlmProviderConfig::Vertex(vertex),
             port: 3000,
             log_level: LogLevel::Info,
             enable_retries: true,

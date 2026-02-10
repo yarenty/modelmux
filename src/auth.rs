@@ -1,8 +1,8 @@
 //!
-//! Google Cloud Platform authentication provider for Vertex AI access.
+//! Authentication for LLM backends (Vertex GCP OAuth2, Bearer token for other providers).
 //!
-//! Handles OAuth2 authentication with Google Cloud Platform using service account
-//! credentials. Follows Single Responsibility Principle - only handles authentication.
+//! [RequestAuth] is the unified type used by the server; it is built from the
+//! provider's [crate::provider::AuthStrategy].
 //!
 //! Authors:
 //!   Jaro <yarenty@gmail.com>
@@ -20,8 +20,48 @@ use yup_oauth2::{ServiceAccountAuthenticator, ServiceAccountKey as OAuthKey, hyp
 
 use crate::config::ServiceAccountKey;
 use crate::error::{ProxyError, Result};
+use crate::provider::AuthStrategy;
 
-/* --- types ----------------------------------------------------------------------------------- */
+/* --- request auth (provider-agnostic) -------------------------------------------------------- */
+
+///
+/// Unified auth for outgoing LLM requests: GCP OAuth2 or static Bearer token.
+///
+/// Built from [AuthStrategy]; the server uses this to attach the correct header.
+pub enum RequestAuth {
+    /// Google Cloud OAuth2 (Vertex AI).
+    Gcp(Arc<GcpAuthProvider>),
+    /// Static Bearer token (e.g. OpenAI-compatible, Mistral).
+    Bearer(String),
+}
+
+impl RequestAuth {
+    ///
+    /// Build [RequestAuth] from the provider's auth strategy.
+    pub async fn from_strategy(strategy: &AuthStrategy) -> Result<Self> {
+        match strategy {
+            AuthStrategy::GcpOAuth2(key) => {
+                let provider = GcpAuthProvider::new(key).await?;
+                Ok(Self::Gcp(Arc::new(provider)))
+            }
+            AuthStrategy::BearerToken(token) => Ok(Self::Bearer(token.clone())),
+        }
+    }
+
+    ///
+    /// Return the value for the `Authorization` header (e.g. `Bearer <token>`).
+    pub async fn authorization_header_value(&self) -> Result<String> {
+        match self {
+            Self::Gcp(gcp) => {
+                let token = gcp.get_access_token().await?;
+                Ok(format!("Bearer {}", token))
+            }
+            Self::Bearer(t) => Ok(format!("Bearer {}", t)),
+        }
+    }
+}
+
+/* --- GCP auth provider ----------------------------------------------------------------------- */
 
 ///
 /// Google Cloud Platform authentication provider.
