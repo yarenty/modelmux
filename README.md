@@ -491,3 +491,11 @@ cargo run
 <p align="center">
 <strong>ModelMux</strong> - Because your AI shouldn't be tied to one vendor.
 </p>
+
+---
+
+## Activity
+
+![Alt](https://repobeats.axiom.co/api/embed/b86b498b31f051472e6f18dff8cf6297dd51be6a.svg "Repobeats analytics image")
+
+---
