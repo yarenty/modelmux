@@ -40,7 +40,7 @@ pub mod error;
 pub mod server;
 
 // Re-export commonly used types
-pub use config::Config;
+pub use config::{Config, ValidationIssue, ValidationSeverity};
 pub use error::ProxyError;
 
 /// Creates a new ModelMux application with the given configuration.

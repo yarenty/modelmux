@@ -88,6 +88,7 @@ use axum::routing::{get, post};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{Level, info};
+use dotenvy;
 
 use crate::config::Config;
 use crate::error::Result;
@@ -139,17 +140,36 @@ async fn main() -> Result<()> {
 fn handle_cli_args() {
     let args: Vec<String> = env::args().collect();
 
-    for arg in &args[1..] {
-        match arg.as_str() {
-            "--version" | "-V" => {
-                println!("modelmux {}", VERSION);
-                std::process::exit(0);
-            }
-            "--help" | "-h" => {
+    if args.len() < 2 {
+        return; // No arguments, proceed with normal startup
+    }
+
+    match args[1].as_str() {
+        "--version" | "-V" => {
+            println!("modelmux {}", VERSION);
+            std::process::exit(0);
+        }
+        "--help" | "-h" => {
+            print_help();
+            std::process::exit(0);
+        }
+        "doctor" => {
+            run_doctor();
+            std::process::exit(0);
+        }
+        "validate" => {
+            let exit_code = run_validate();
+            std::process::exit(exit_code);
+        }
+        _ => {
+            // Unknown command - show help
+            if args[1].starts_with('-') {
+                eprintln!("Unknown option: {}", args[1]);
+                eprintln!();
                 print_help();
-                std::process::exit(0);
+                std::process::exit(1);
             }
-            _ => {}
+            // Not a command, proceed with normal startup
         }
     }
 }
@@ -161,11 +181,15 @@ fn print_help() {
     println!("High-performance proxy server converting OpenAI API requests to Vertex AI format");
     println!();
     println!("USAGE:");
-    println!("    modelmux [OPTIONS]");
+    println!("    modelmux [COMMAND] [OPTIONS]");
+    println!();
+    println!("COMMANDS:");
+    println!("    doctor              Check configuration and system health");
+    println!("    validate            Validate configuration and exit");
     println!();
     println!("OPTIONS:");
-    println!("    -h, --help       Print help information");
-    println!("    -V, --version    Print version information");
+    println!("    -h, --help          Print help information");
+    println!("    -V, --version       Print version information");
     println!();
     println!("ENVIRONMENT VARIABLES:");
     println!(
@@ -182,7 +206,172 @@ fn print_help() {
         "    STREAMING_MODE            Streaming mode: auto, non-streaming, standard, buffered (default: auto)"
     );
     println!();
+    println!("EXAMPLES:");
+    println!("    modelmux                    Start the proxy server");
+    println!("    modelmux doctor             Check configuration");
+    println!("    modelmux validate           Validate and exit");
+    println!();
     println!("For more information, visit: https://github.com/yarenty/modelmux");
+}
+
+///
+/// Run the doctor command to check configuration and system health.
+///
+/// Performs comprehensive checks and provides helpful diagnostics.
+fn run_doctor() {
+    // Load .env file first so we can check actual environment variables
+    let _ = dotenvy::dotenv();
+    
+    println!("🔍 ModelMux Doctor - Configuration Health Check");
+    println!("{}", "=".repeat(60));
+    println!();
+
+    // Check for .env file
+    let env_file_exists = std::path::Path::new(".env").exists();
+    if env_file_exists {
+        println!("✅ Found .env file");
+    } else {
+        println!("ℹ️  No .env file found (using environment variables)");
+    }
+    println!();
+
+    // Check required environment variables
+    println!("📋 Checking Required Environment Variables:");
+    let required_vars = vec![
+        "GCP_SERVICE_ACCOUNT_KEY",
+        "LLM_URL",
+        "LLM_CHAT_ENDPOINT",
+        "LLM_MODEL",
+    ];
+
+    let mut missing_vars = Vec::new();
+    for var in &required_vars {
+        match std::env::var(var) {
+            Ok(val) => {
+                if val.is_empty() {
+                    println!("  ❌ {}: Set but empty", var);
+                    missing_vars.push(var);
+                } else {
+                    // Mask sensitive values
+                    let display_val = if *var == "GCP_SERVICE_ACCOUNT_KEY" {
+                        format!("{}... ({} chars)", &val[..val.len().min(20)], val.len())
+                    } else {
+                        val
+                    };
+                    println!("  ✅ {}: {}", var, display_val);
+                }
+            }
+            Err(_) => {
+                println!("  ❌ {}: Not set", var);
+                missing_vars.push(var);
+            }
+        }
+    }
+    println!();
+
+    // Try to load and validate config
+    println!("🔧 Configuration Validation:");
+    match Config::from_env() {
+        Ok(config) => {
+            println!("  ✅ Configuration loaded successfully");
+            println!();
+
+            let issues = config.validate();
+            if issues.is_empty() {
+                println!("  ✅ No validation issues found");
+                println!();
+                println!("✨ Configuration looks good! You're ready to run ModelMux.");
+            } else {
+                let errors: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Error).collect();
+                let warnings: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Warning).collect();
+                let infos: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Info).collect();
+
+                if !errors.is_empty() {
+                    println!("  ❌ Found {} error(s):", errors.len());
+                    for issue in &errors {
+                        println!("     • {}: {}", issue.field, issue.message);
+                        if let Some(suggestion) = &issue.suggestion {
+                            println!("       💡 {}", suggestion);
+                        }
+                    }
+                    println!();
+                }
+
+                if !warnings.is_empty() {
+                    println!("  ⚠️  Found {} warning(s):", warnings.len());
+                    for issue in &warnings {
+                        println!("     • {}: {}", issue.field, issue.message);
+                        if let Some(suggestion) = &issue.suggestion {
+                            println!("       💡 {}", suggestion);
+                        }
+                    }
+                    println!();
+                }
+
+                if !infos.is_empty() {
+                    println!("  ℹ️  Found {} info message(s):", infos.len());
+                    for issue in &infos {
+                        println!("     • {}: {}", issue.field, issue.message);
+                        if let Some(suggestion) = &issue.suggestion {
+                            println!("       💡 {}", suggestion);
+                        }
+                    }
+                    println!();
+                }
+
+                if errors.is_empty() {
+                    println!("✨ Configuration has warnings but should work. Review suggestions above.");
+                } else {
+                    println!("❌ Configuration has errors. Please fix them before running ModelMux.");
+                }
+            }
+        }
+        Err(e) => {
+            println!("  ❌ Failed to load configuration:");
+            println!("     {}", e);
+            println!();
+            if !missing_vars.is_empty() {
+                println!("💡 Suggestions:");
+                println!("   1. Set missing environment variables:");
+                for var in &missing_vars {
+                    println!("      export {}=\"your-value\"", var);
+                }
+                println!("   2. Or create a .env file with these variables");
+                println!("   3. Run 'modelmux doctor' again to verify");
+            }
+        }
+    }
+}
+
+///
+/// Run the validate command to validate configuration and exit.
+///
+/// Returns exit code 0 if valid, 1 if invalid.
+fn run_validate() -> i32 {
+    match Config::from_env() {
+        Ok(config) => {
+            let issues = config.validate();
+            let errors: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Error).collect();
+
+            if errors.is_empty() {
+                println!("✅ Configuration is valid");
+                0
+            } else {
+                eprintln!("❌ Configuration validation failed:");
+                for issue in &errors {
+                    eprintln!("  • {}: {}", issue.field, issue.message);
+                    if let Some(suggestion) = &issue.suggestion {
+                        eprintln!("    Suggestion: {}", suggestion);
+                    }
+                }
+                1
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Configuration error: {}", e);
+            1
+        }
+    }
 }
 
 ///
@@ -268,7 +457,39 @@ fn create_router(app_state: Arc<AppState>) -> Router {
 async fn start_server(config: &Config, app: Router) -> Result<()> {
     let listener =
         tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port)).await.map_err(|e| {
-            crate::error::ProxyError::Http(format!("Failed to bind to port {}: {}", config.port, e))
+            let error_msg = format!("Failed to bind to port {}: {}", config.port, e);
+            
+            // Check if it's an "Address already in use" error and provide helpful suggestions
+            let error_str = e.to_string();
+            if error_str.contains("Address already in use") || error_str.contains("address already in use") {
+                let suggestions = format!(
+                    "{}\n\n\
+                    💡 Port {} is already in use. Here are some solutions:\n\n\
+                    1. Close the other instance:\n\
+                       • Find the process using port {}:\n\
+                         lsof -i :{}\n\
+                       • Kill the process:\n\
+                         kill -9 <PID>\n\n\
+                    2. Use killport (if installed):\n\
+                       killport {}\n\n\
+                    3. Change the port:\n\
+                       export PORT=3001\n\
+                       modelmux\n\n\
+                    Run 'modelmux doctor' for more help.",
+                    error_msg, config.port, config.port, config.port, config.port
+                );
+                crate::error::ProxyError::Http(suggestions)
+            } else {
+                crate::error::ProxyError::Http(format!(
+                    "{}\n\n\
+                    💡 To fix this:\n\
+                    • Check if the port is valid (1-65535)\n\
+                    • Ensure you have permission to bind to the port\n\
+                    • Try a different port: export PORT=3001\n\n\
+                    Run 'modelmux doctor' for more help.",
+                    error_msg
+                ))
+            }
         })?;
 
     log_startup_info(config);
