@@ -1,3 +1,7 @@
+# typed: true
+# frozen_string_literal: true
+
+# ModelMux - high-performance proxy converting OpenAI API to Vertex AI (Claude).
 class Modelmux < Formula
   desc "High-performance proxy server converting OpenAI API requests to Vertex AI format"
   homepage "https://github.com/yarenty/modelmux"
@@ -33,8 +37,23 @@ class Modelmux < Formula
 
     # Test configuration validation with minimal valid config
     # Create a minimal valid base64-encoded service account key JSON
-    minimal_key_json = '{"type":"service_account","project_id":"test-project","private_key_id":"test-key-id","private_key":"-----BEGIN PRIVATE KEY-----\\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\\n-----END PRIVATE KEY-----\\n","client_email":"test@test-project.iam.gserviceaccount.com","client_id":"123456789","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com"}'
-    key_b64 = `echo -n '#{minimal_key_json}' | base64`.strip
+    require "base64"
+    require "json"
+    pk = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n" \
+         "-----END PRIVATE KEY-----\n"
+    minimal_key = {
+      "auth_provider_x509_cert_url" => "https://www.googleapis.com/oauth2/v1/certs",
+      "auth_uri"                     => "https://accounts.google.com/o/oauth2/auth",
+      "client_email"                 => "test@test-project.iam.gserviceaccount.com",
+      "client_id"                    => "123456789",
+      "client_x509_cert_url"         => "https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com",
+      "private_key"                  => pk,
+      "private_key_id"               => "test-key-id",
+      "project_id"                   => "test-project",
+      "token_uri"                    => "https://oauth2.googleapis.com/token",
+      "type"                         => "service_account",
+    }
+    key_b64 = Base64.strict_encode64(minimal_key.to_json)
 
     ENV["GCP_SERVICE_ACCOUNT_KEY"] = key_b64
     ENV["LLM_PROVIDER"] = "vertex"
@@ -43,7 +62,7 @@ class Modelmux < Formula
     ENV["VERTEX_LOCATION"] = "test-region"
     ENV["VERTEX_PUBLISHER"] = "test-publisher"
     ENV["VERTEX_MODEL_ID"] = "test-model"
-    ENV["PORT"] = "0"  # Use port 0 to avoid conflicts
+    ENV["PORT"] = "0" # Use port 0 to avoid conflicts
 
     # This should fail gracefully with auth/network error, proving config parsing works
     # The server will try to start but fail on actual API calls, which is expected
