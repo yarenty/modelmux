@@ -15,10 +15,10 @@ use std::str;
 fn get_binary_command() -> Command {
     // Try to use the built binary first, fall back to cargo run
     if std::path::Path::new("target/release/modelmux").exists() {
-        let mut cmd = Command::new("target/release/modelmux");
+        let cmd = Command::new("target/release/modelmux");
         cmd
     } else if std::path::Path::new("target/debug/modelmux").exists() {
-        let mut cmd = Command::new("target/debug/modelmux");
+        let cmd = Command::new("target/debug/modelmux");
         cmd
     } else {
         // Fall back to cargo run for development

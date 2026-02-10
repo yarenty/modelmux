@@ -6,6 +6,7 @@
 //! Note: These are basic integration tests. For full end-to-end testing with a running
 //! server, use a test harness like axum-test or start a test server in the test setup.
 
+use base64::Engine;
 use modelmux::config::{Config, LogLevel, ServiceAccountKey, StreamingMode};
 
 /// Test that create_app function works with valid config
@@ -64,10 +65,4 @@ fn create_test_config() -> Config {
         max_retry_attempts: 3,
         streaming_mode: StreamingMode::Auto,
     }
-}
-
-/// Helper function to create test app state
-async fn create_test_app_state() -> Arc<AppState> {
-    let config = create_test_config();
-    Arc::new(AppState::new(config).await.unwrap())
 }
