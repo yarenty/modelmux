@@ -10,17 +10,13 @@ use std::process::Command;
 use std::str;
 
 /// Get the path to the modelmux binary
-/// In CI/Homebrew, this would be the installed binary path
-/// For local testing, we use cargo run
+/// Prefer debug binary so `cargo test` uses the binary just built; then release, then cargo run.
 fn get_binary_command() -> Command {
-    // Try to use the built binary first, fall back to cargo run
-    if std::path::Path::new("target/release/modelmux").exists() {
-        Command::new("target/release/modelmux")
-    } else if std::path::Path::new("target/debug/modelmux").exists() {
+    if std::path::Path::new("target/debug/modelmux").exists() {
         Command::new("target/debug/modelmux")
+    } else if std::path::Path::new("target/release/modelmux").exists() {
+        Command::new("target/release/modelmux")
     } else {
-        // Fall back to cargo run for development
-        // Note: When using cargo run, we need to pass args after --
         let mut cmd = Command::new("cargo");
         cmd.args(&["run", "--bin", "modelmux", "--"]);
         cmd
@@ -128,13 +124,18 @@ fn test_doctor_command() {
     
     // Doctor command should produce some output (diagnostics)
     // It may contain various keywords depending on config state
-    // Check for text indicators that doctor ran, or clear HTTP/port errors
-    let has_diagnostic_keywords = combined.contains("Doctor") 
+    // Check for text indicators that doctor ran, or config/port errors
+    let has_diagnostic_keywords = combined.contains("Doctor")
         || combined.contains("ModelMux Doctor")
-        || combined.contains("Configuration") 
+        || combined.contains("Configuration")
         || combined.contains("Checking")
         || combined.contains("Environment")
         || combined.contains("Variables")
+        || combined.contains("Failed to load configuration")
+        || combined.contains("Vertex")
+        || combined.contains("LLM_PREDICT_URL")
+        || combined.contains("VERTEX_")
+        || combined.contains("GCP_SERVICE_ACCOUNT")
         || combined.contains("Failed to bind to port")
         || combined.contains("Address already in use")
         || combined.contains("Http(\"Failed to bind to port")
@@ -164,18 +165,24 @@ fn test_doctor_command() {
 fn test_validate_command() {
     let mut cmd = get_binary_command();
     cmd.arg("validate");
-    
+    // No env: config load fails; binary prints "[ERROR] Configuration error: ..."
     let output = cmd.output().expect("Failed to execute command");
 
-    // Validate may succeed or fail depending on config, but should run
-    // Exit code 0 = valid, 1 = invalid (both are acceptable)
     let stdout = str::from_utf8(&output.stdout).expect("Invalid UTF-8");
     let stderr = str::from_utf8(&output.stderr).expect("Invalid UTF-8");
     let combined = format!("{}\n{}", stdout, stderr);
-    
-    // Should contain validation result (valid/invalid/error message)
+
+    // Should contain validation result: valid, or error/Configuration from current provider messages
+    let has_result = combined.contains("valid")
+        || combined.contains("error")
+        || combined.contains("Configuration")
+        || combined.contains("[ERROR]")
+        || combined.contains("[OK]")
+        || combined.contains("Vertex")
+        || combined.contains("LLM_PREDICT_URL")
+        || combined.contains("GCP_SERVICE_ACCOUNT");
     assert!(
-        combined.contains("valid") || combined.contains("error") || combined.contains("Configuration") || combined.contains("[ERROR]") || combined.contains("[OK]"),
+        has_result,
         "Validate output should contain validation result, got stdout: {}, stderr: {}",
         stdout,
         stderr

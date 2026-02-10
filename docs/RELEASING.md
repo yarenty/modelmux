@@ -19,9 +19,9 @@ cargo build --release
 ./target/release/modelmux --version
 
 # 5. Commit and tag
-git add Cargo.toml packaging/homebrew/modelmux.rb
-git commit -m "Release v0.1.0"
-git tag v0.1.0
+git add Cargo.toml packaging/homebrew/modelmux.rb CHANGELOG.md
+git commit -m "Release v0.5.0"
+git tag v0.5.0
 git push origin main --tags
 
 # 6. Create GitHub release (via web UI)
@@ -42,13 +42,13 @@ vim packaging/homebrew/modelmux.rb  # Update sha256 field
 **Cargo.toml:**
 ```toml
 [package]
-version = "0.1.0"  # Update this
+version = "0.5.0"  # Update this
 ```
 
 **packaging/homebrew/modelmux.rb:**
 ```ruby
-url "https://github.com/yarenty/modelmux/archive/refs/tags/v0.1.0.tar.gz"
-# Update version in URL
+url "https://github.com/yarenty/modelmux/archive/refs/tags/v0.5.0.tar.gz"
+# Update version in URL; replace sha256 after creating the release tarball
 ```
 
 ### 2. Run Tests
@@ -70,23 +70,23 @@ cargo build --release
 ### 4. Create Git Tag and Release
 
 ```bash
-git add Cargo.toml packaging/homebrew/modelmux.rb
-git commit -m "Release v0.1.0"
-git tag v0.1.0
+git add Cargo.toml packaging/homebrew/modelmux.rb CHANGELOG.md
+git commit -m "Release v0.5.0"
+git tag v0.5.0
 git push origin main
-git push origin v0.1.0
+git push origin v0.5.0
 ```
 
 ### 5. Create GitHub Release
 
 1. Go to GitHub Releases page
 2. Click "Draft a new release"
-3. Select tag `v0.1.0`
+3. Select tag `v0.5.0`
 4. Upload source tarball (GitHub auto-generates or create manually)
 5. Get SHA256:
    ```bash
-   shasum -a 256 modelmux-0.1.0.tar.gz
-   ```
+      curl -sL https://github.com/yarenty/modelmux/archive/refs/tags/v0.5.0.tar.gz | shasum -a 256
+     ```
 
 ### 6. Update Homebrew Formula SHA256
 
@@ -139,7 +139,7 @@ TAP_DIR=$(brew --repository yarenty/tap)
 cp packaging/homebrew/modelmux.rb "$TAP_DIR/Formula/modelmux.rb"
 cd "$TAP_DIR"
 git add Formula/modelmux.rb
-git commit -m "modelmux 0.x.x"
+git commit -m "modelmux 0.5.0"
 git push origin main
 ```
 

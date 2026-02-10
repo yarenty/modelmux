@@ -5,7 +5,30 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.2] - 2026-02-10
+## [0.5.0] - 2026-02-10
+
+### Added
+
+- **LLM provider abstraction**: Configuration is driven by `LLM_PROVIDER`; only the selected backend is loaded.
+- **`LlmProviderBackend` trait**: All backends implement `id()`, `build_request_url()`, `display_model_name()`, `auth_strategy()`.
+- **Vertex provider**: Supports either full URL override (`LLM_PREDICT_URL`) or Google-docs-style vars (`VERTEX_REGION`, `VERTEX_PROJECT`, `VERTEX_LOCATION`, `VERTEX_PUBLISHER`, `VERTEX_MODEL_ID`).
+- **OpenAI-compatible provider stub**: Template for future Mistral/OpenAI-compatible backends (not yet implemented).
+- **`AuthStrategy`**: `GcpOAuth2(ServiceAccountKey)` or `BearerToken(String)` per provider.
+- **`RequestAuth`**: Unified request auth (GCP or Bearer); server uses it for the `Authorization` header.
+
+### Changed
+
+- **Config**: Replaced flat `predict_resource_url` / `llm_model` / `service_account_key` with `llm_provider: LlmProviderConfig`. `build_predict_url()` and `llm_model()` delegate to the provider.
+- **.env**: Use `LLM_PROVIDER=vertex` and either `LLM_PREDICT_URL` or Vertex vars. See `.env.example`.
+
+### Documentation
+
+- **Help / doctor**: Updated to describe only override and Vertex config.
+- **.env.example**: Shows Vertex vars and optional `LLM_PREDICT_URL` override.
+
+---
+
+## [0.3.1] - 2026-02-10
 
 ### Added
 
@@ -173,12 +196,14 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
-- **0.3.2** (2026-02-10): Homebrew tap published; docs simplified
+- **0.5.0** (2026-02-10): Provider abstraction, LLM_PROVIDER, Vertex/override config; legacy config removed
+- **0.3.1** (2026-02-10): Homebrew tap published; docs simplified
 - **0.3.0** (2026-02-10): Fixed doctor command, improved error messages, documentation cleanup
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
-[0.3.2]: https://github.com/yarenty/modelmux/compare/v0.3.1...v0.3.2
+[0.5.0]: https://github.com/yarenty/modelmux/compare/v0.3.1...v0.5.0
+[0.3.1]: https://github.com/yarenty/modelmux/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yarenty/modelmux/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yarenty/modelmux/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yarenty/modelmux/releases/tag/v0.1.0
