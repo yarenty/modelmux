@@ -254,21 +254,27 @@ fn print_help() {
 ///
 /// Performs comprehensive checks and provides helpful diagnostics.
 fn run_doctor() {
-    // Load .env file first so we can check actual environment variables
-    let _ = dotenvy::dotenv();
-    
-    println!("ModelMux Doctor - Configuration Health Check");
-    println!("{}", "=".repeat(60));
-    println!();
-
-    // Check for .env file
-    let env_file_exists = std::path::Path::new(".env").exists();
-    if env_file_exists {
-        println!("[OK] Found .env file");
-    } else {
-        println!("[INFO] No .env file found (using environment variables)");
-    }
-    println!();
+    // Load .env file first so we can check actual environment variables.
+    // dotenvy walks up from current directory; returns Ok(path) if found, Err if not.
+    let env_loaded = match dotenvy::dotenv() {
+        Ok(path) => {
+            println!("ModelMux Doctor - Configuration Health Check");
+            println!("{}", "=".repeat(60));
+            println!();
+            println!("[OK] Loaded .env from {}", path.display());
+            println!();
+            true
+        }
+        Err(_) => {
+            println!("ModelMux Doctor - Configuration Health Check");
+            println!("{}", "=".repeat(60));
+            println!();
+            println!("[INFO] No .env file found in current directory or parents");
+            println!("       (using environment variables only)");
+            println!();
+            false
+        }
+    };
 
     // Try to load and validate config
     println!("Configuration Validation:");
@@ -332,6 +338,9 @@ fn run_doctor() {
             println!("     {}", e);
             println!();
             println!("Suggestions:");
+            if !env_loaded {
+                println!("   • Run 'modelmux doctor' from your project directory (where .env is located)");
+            }
             println!("   • Use either LLM_URL (full resource URL) or Vertex-specific fields (GCP_SERVICE_ACCOUNT_KEY, VERTEX_*)");
             println!("   • Ensure GCP_SERVICE_ACCOUNT_KEY is set (base64-encoded JSON key)");
             println!("   • Run 'modelmux --help' for full environment variable reference");
