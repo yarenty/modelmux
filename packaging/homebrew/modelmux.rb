@@ -1,8 +1,8 @@
 class Modelmux < Formula
   desc "High-performance proxy server converting OpenAI API requests to Vertex AI format"
   homepage "https://github.com/yarenty/modelmux"
-  url "https://github.com/yarenty/modelmux/archive/refs/tags/v0.3.1.tar.gz"
-  sha256 "4775bc0a88962e8421ef65e0ffe04b6c0b889490bc59a32723702e5de656bd2f"
+  url "https://github.com/yarenty/modelmux/archive/refs/tags/v0.5.0.tar.gz"
+  sha256 "a2927cebfce46da98c6739b18cc72c02fd84583b5ba735ed0e98aa703a9e6342"
   license any_of: ["MIT", "Apache-2.0"]
   head "https://github.com/yarenty/modelmux.git", branch: "main"
 
@@ -37,9 +37,12 @@ class Modelmux < Formula
     key_b64 = `echo -n '#{minimal_key_json}' | base64`.strip
 
     ENV["GCP_SERVICE_ACCOUNT_KEY"] = key_b64
-    ENV["LLM_URL"] = "https://test.example.com/v1/"
-    ENV["LLM_CHAT_ENDPOINT"] = "test-model:streamRawPredict"
-    ENV["LLM_MODEL"] = "test-model"
+    ENV["LLM_PROVIDER"] = "vertex"
+    ENV["VERTEX_REGION"] = "test-region"
+    ENV["VERTEX_PROJECT"] = "test-project"
+    ENV["VERTEX_LOCATION"] = "test-region"
+    ENV["VERTEX_PUBLISHER"] = "test-publisher"
+    ENV["VERTEX_MODEL_ID"] = "test-model"
     ENV["PORT"] = "0"  # Use port 0 to avoid conflicts
 
     # This should fail gracefully with auth/network error, proving config parsing works
