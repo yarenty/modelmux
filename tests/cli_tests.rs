@@ -128,21 +128,22 @@ fn test_doctor_command() {
     
     // Doctor command should produce some output (diagnostics)
     // It may contain various keywords depending on config state
-    // Check for emoji or text indicators that doctor ran, or clear HTTP/port errors
-    let has_diagnostic_keywords = combined.contains("Doctor")
+    // Check for text indicators that doctor ran, or clear HTTP/port errors
+    let has_diagnostic_keywords = combined.contains("Doctor") 
         || combined.contains("ModelMux Doctor")
-        || combined.contains("Configuration")
+        || combined.contains("Configuration") 
         || combined.contains("Checking")
         || combined.contains("Environment")
         || combined.contains("Variables")
         || combined.contains("Failed to bind to port")
         || combined.contains("Address already in use")
         || combined.contains("Http(\"Failed to bind to port")
-        || combined.contains("✅")
-        || combined.contains("❌")
-        || combined.contains("🔍")
-        || combined.contains("📋")
-        || combined.contains("🔧");
+        || combined.contains("[OK]")
+        || combined.contains("[ERROR]")
+        || combined.contains("[WARNING]")
+        || combined.contains("[INFO]")
+        || combined.contains("[TIP]")
+        || combined.contains("[SUCCESS]");
     
     // If we got any output at all, that's a good sign
     // The command should at least print something
@@ -174,7 +175,7 @@ fn test_validate_command() {
     
     // Should contain validation result (valid/invalid/error message)
     assert!(
-        combined.contains("valid") || combined.contains("error") || combined.contains("Configuration") || combined.contains("❌") || combined.contains("✅"),
+        combined.contains("valid") || combined.contains("error") || combined.contains("Configuration") || combined.contains("[ERROR]") || combined.contains("[OK]"),
         "Validate output should contain validation result, got stdout: {}, stderr: {}",
         stdout,
         stderr

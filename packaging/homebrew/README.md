@@ -46,4 +46,3 @@ See [../../docs/RELEASING.md](../../docs/RELEASING.md) for detailed release inst
 ## See Also
 
 - [docs/RELEASING.md](../../docs/RELEASING.md) - Release process
-- [HOMEBREW_READINESS.md](../../HOMEBREW_READINESS.md) - Readiness checklist

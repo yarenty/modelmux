@@ -5,6 +5,29 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-10
+
+### Fixed
+
+- **Doctor command**: Fixed `modelmux doctor` to properly load `.env` file before checking environment variables
+- **Port binding errors**: Enhanced error messages for port binding failures with actionable suggestions:
+  - Instructions to find and kill processes using the port
+  - Suggestion to use `killport` utility
+  - Guidance on changing port via environment variable
+
+### Changed
+
+- **Documentation cleanup**: Removed `HOMEBREW_READINESS.md` as it's no longer necessary
+- **Link updates**: Updated all references to removed documentation files
+
+### Technical Details
+
+- **Environment loading**: `run_doctor()` now calls `dotenvy::dotenv()` before checking environment variables
+- **Error handling**: Port binding errors now provide comprehensive troubleshooting guidance
+- **Test improvements**: Updated CLI tests to handle port binding errors as valid diagnostic output
+
+---
+
 ## [0.2.0] - 2026-02-10
 
 ### Added
@@ -30,12 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Proper base64 encoding for test credentials
 - **Packaging structure**: Organized packaging files into `packaging/homebrew/` directory
 - **Release documentation**: Created `docs/RELEASING.md` with step-by-step release process
-- **Homebrew readiness**: Documented in `HOMEBREW_READINESS.md` with complete checklist
 
 #### Documentation
 - **Release guide**: Added `docs/RELEASING.md` with copy-pasteable release commands
 - **Testing guide**: Added `docs/TESTING.md` with comprehensive testing documentation
-- **Homebrew guide**: Added `HOMEBREW_READINESS.md` with deployment checklist
 - **Packaging README**: Added `packaging/homebrew/README.md` explaining formula structure
 
 ### Changed
@@ -145,8 +166,10 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
+- **0.3.0** (2026-02-10): Fixed doctor command, improved error messages, documentation cleanup
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[0.3.0]: https://github.com/yarenty/modelmux/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/yarenty/modelmux/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yarenty/modelmux/releases/tag/v0.1.0

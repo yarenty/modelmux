@@ -194,6 +194,5 @@ shasum -a 256 modelmux-0.1.0.tar.gz
 
 ## See Also
 
-- [HOMEBREW_READINESS.md](../HOMEBREW_READINESS.md) - Detailed readiness checklist
 - [TESTING.md](TESTING.md) - Testing guide
 - [Homebrew Formula Cookbook](https://docs.brew.sh/Formula-Cookbook)

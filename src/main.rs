@@ -120,10 +120,22 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 ///  * `Ok(())` on successful server shutdown
 ///  * `ProxyError` if initialization or server startup fails
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     // Handle CLI arguments before config loading
     handle_cli_args();
 
+    if let Err(e) = run().await {
+        // Print error message line by line to ensure proper formatting
+        let error_msg = format!("{}", e);
+        eprintln!("Error:");
+        for line in error_msg.lines() {
+            eprintln!("{}", line);
+        }
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<()> {
     let config = initialize_config()?;
     initialize_logging(&config);
 
@@ -162,14 +174,26 @@ fn handle_cli_args() {
             std::process::exit(exit_code);
         }
         _ => {
-            // Unknown command - show help
+            // Unknown command or option - show error and help
             if args[1].starts_with('-') {
-                eprintln!("Unknown option: {}", args[1]);
+                eprintln!("Error: Unknown option: {}", args[1]);
                 eprintln!();
                 print_help();
                 std::process::exit(1);
+            } else {
+                eprintln!("Error: Unknown command: {}", args[1]);
+                eprintln!();
+                eprintln!("Available commands:");
+                eprintln!("  doctor    - Run configuration health check");
+                eprintln!("  validate  - Validate configuration");
+                eprintln!();
+                eprintln!("Available options:");
+                eprintln!("  --version, -V  - Show version");
+                eprintln!("  --help, -h     - Show help");
+                eprintln!();
+                eprintln!("Run 'modelmux --help' for more information.");
+                std::process::exit(1);
             }
-            // Not a command, proceed with normal startup
         }
     }
 }
@@ -222,21 +246,21 @@ fn run_doctor() {
     // Load .env file first so we can check actual environment variables
     let _ = dotenvy::dotenv();
     
-    println!("🔍 ModelMux Doctor - Configuration Health Check");
+    println!("ModelMux Doctor - Configuration Health Check");
     println!("{}", "=".repeat(60));
     println!();
 
     // Check for .env file
     let env_file_exists = std::path::Path::new(".env").exists();
     if env_file_exists {
-        println!("✅ Found .env file");
+        println!("[OK] Found .env file");
     } else {
-        println!("ℹ️  No .env file found (using environment variables)");
+        println!("[INFO] No .env file found (using environment variables)");
     }
     println!();
 
     // Check required environment variables
-    println!("📋 Checking Required Environment Variables:");
+    println!("Checking Required Environment Variables:");
     let required_vars = vec![
         "GCP_SERVICE_ACCOUNT_KEY",
         "LLM_URL",
@@ -249,7 +273,7 @@ fn run_doctor() {
         match std::env::var(var) {
             Ok(val) => {
                 if val.is_empty() {
-                    println!("  ❌ {}: Set but empty", var);
+                    println!("  [ERROR] {}: Set but empty", var);
                     missing_vars.push(var);
                 } else {
                     // Mask sensitive values
@@ -258,11 +282,11 @@ fn run_doctor() {
                     } else {
                         val
                     };
-                    println!("  ✅ {}: {}", var, display_val);
+                    println!("  [OK] {}: {}", var, display_val);
                 }
             }
             Err(_) => {
-                println!("  ❌ {}: Not set", var);
+                println!("  [ERROR] {}: Not set", var);
                 missing_vars.push(var);
             }
         }
@@ -270,68 +294,68 @@ fn run_doctor() {
     println!();
 
     // Try to load and validate config
-    println!("🔧 Configuration Validation:");
+    println!("Configuration Validation:");
     match Config::from_env() {
         Ok(config) => {
-            println!("  ✅ Configuration loaded successfully");
+            println!("  [OK] Configuration loaded successfully");
             println!();
 
             let issues = config.validate();
             if issues.is_empty() {
-                println!("  ✅ No validation issues found");
+                println!("  [OK] No validation issues found");
                 println!();
-                println!("✨ Configuration looks good! You're ready to run ModelMux.");
+                println!("[SUCCESS] Configuration looks good! You're ready to run ModelMux.");
             } else {
                 let errors: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Error).collect();
                 let warnings: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Warning).collect();
                 let infos: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Info).collect();
 
                 if !errors.is_empty() {
-                    println!("  ❌ Found {} error(s):", errors.len());
+                    println!("  [ERROR] Found {} error(s):", errors.len());
                     for issue in &errors {
                         println!("     • {}: {}", issue.field, issue.message);
                         if let Some(suggestion) = &issue.suggestion {
-                            println!("       💡 {}", suggestion);
+                            println!("       [TIP] {}", suggestion);
                         }
                     }
                     println!();
                 }
 
                 if !warnings.is_empty() {
-                    println!("  ⚠️  Found {} warning(s):", warnings.len());
+                    println!("  [WARNING] Found {} warning(s):", warnings.len());
                     for issue in &warnings {
                         println!("     • {}: {}", issue.field, issue.message);
                         if let Some(suggestion) = &issue.suggestion {
-                            println!("       💡 {}", suggestion);
+                            println!("       [TIP] {}", suggestion);
                         }
                     }
                     println!();
                 }
 
                 if !infos.is_empty() {
-                    println!("  ℹ️  Found {} info message(s):", infos.len());
+                    println!("  [INFO] Found {} info message(s):", infos.len());
                     for issue in &infos {
                         println!("     • {}: {}", issue.field, issue.message);
                         if let Some(suggestion) = &issue.suggestion {
-                            println!("       💡 {}", suggestion);
+                            println!("       [TIP] {}", suggestion);
                         }
                     }
                     println!();
                 }
 
                 if errors.is_empty() {
-                    println!("✨ Configuration has warnings but should work. Review suggestions above.");
+                    println!("[SUCCESS] Configuration has warnings but should work. Review suggestions above.");
                 } else {
-                    println!("❌ Configuration has errors. Please fix them before running ModelMux.");
+                    println!("[ERROR] Configuration has errors. Please fix them before running ModelMux.");
                 }
             }
         }
         Err(e) => {
-            println!("  ❌ Failed to load configuration:");
+            println!("  [ERROR] Failed to load configuration:");
             println!("     {}", e);
             println!();
             if !missing_vars.is_empty() {
-                println!("💡 Suggestions:");
+                println!("Suggestions:");
                 println!("   1. Set missing environment variables:");
                 for var in &missing_vars {
                     println!("      export {}=\"your-value\"", var);
@@ -354,10 +378,10 @@ fn run_validate() -> i32 {
             let errors: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Error).collect();
 
             if errors.is_empty() {
-                println!("✅ Configuration is valid");
+                println!("[OK] Configuration is valid");
                 0
             } else {
-                eprintln!("❌ Configuration validation failed:");
+                eprintln!("[ERROR] Configuration validation failed:");
                 for issue in &errors {
                     eprintln!("  • {}: {}", issue.field, issue.message);
                     if let Some(suggestion) = &issue.suggestion {
@@ -368,7 +392,7 @@ fn run_validate() -> i32 {
             }
         }
         Err(e) => {
-            eprintln!("❌ Configuration error: {}", e);
+            eprintln!("[ERROR] Configuration error: {}", e);
             1
         }
     }
@@ -464,7 +488,7 @@ async fn start_server(config: &Config, app: Router) -> Result<()> {
             if error_str.contains("Address already in use") || error_str.contains("address already in use") {
                 let suggestions = format!(
                     "{}\n\n\
-                    💡 Port {} is already in use. Here are some solutions:\n\n\
+                    Port {} is already in use. Here are some solutions:\n\n\
                     1. Close the other instance:\n\
                        • Find the process using port {}:\n\
                          lsof -i :{}\n\
@@ -482,7 +506,7 @@ async fn start_server(config: &Config, app: Router) -> Result<()> {
             } else {
                 crate::error::ProxyError::Http(format!(
                     "{}\n\n\
-                    💡 To fix this:\n\
+                    To fix this:\n\
                     • Check if the port is valid (1-65535)\n\
                     • Ensure you have permission to bind to the port\n\
                     • Try a different port: export PORT=3001\n\n\

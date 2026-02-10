@@ -269,7 +269,7 @@ impl Config {
             ProxyError::Config(
                 "GCP_SERVICE_ACCOUNT_KEY environment variable is not set.\n\
          \n\
-         💡 To fix this:\n\
+         To fix this:\n\
            1. Get your Google Cloud service account key JSON file\n\
            2. Encode it to base64: cat key.json | base64\n\
            3. Set the environment variable:\n\
@@ -296,7 +296,7 @@ impl Config {
             ProxyError::Config(
                 "LLM_URL environment variable is not set.\n\
          \n\
-         💡 To fix this:\n\
+         To fix this:\n\
            1. Get your Vertex AI endpoint URL from Google Cloud Console\n\
            2. Format: https://REGION-aiplatform.googleapis.com/v1/projects/PROJECT/locations/LOCATION/publishers/\n\
            3. Set the environment variable:\n\
@@ -320,7 +320,7 @@ impl Config {
             ProxyError::Config(
                 "LLM_CHAT_ENDPOINT environment variable is not set.\n\
          \n\
-         💡 To fix this:\n\
+         To fix this:\n\
            1. Format: MODEL_NAME:streamRawPredict or MODEL_NAME:rawPredict\n\
            2. Example: claude-sonnet-4:streamRawPredict\n\
            3. Set the environment variable:\n\
@@ -344,7 +344,7 @@ impl Config {
             ProxyError::Config(
                 "LLM_MODEL environment variable is not set.\n\
          \n\
-         💡 To fix this:\n\
+         To fix this:\n\
            1. Set the model identifier (e.g., claude-sonnet-4)\n\
            2. Set the environment variable:\n\
               export LLM_MODEL=\"claude-sonnet-4\"\n\
@@ -370,7 +370,7 @@ impl Config {
                 ProxyError::Config(format!(
                     "Invalid PORT value: {}\n\
          \n\
-         💡 PORT must be a number between 1 and 65535.\n\
+         PORT must be a number between 1 and 65535.\n\
             Example: export PORT=3000\n\
          \n\
          Run 'modelmux doctor' for more help.",
@@ -436,7 +436,7 @@ impl Config {
             ProxyError::Config(format!(
                 "Failed to decode base64 service account key: {}\n\
          \n\
-         💡 To fix this:\n\
+         To fix this:\n\
            1. Ensure your key is properly base64-encoded\n\
            2. Encode your JSON key file: cat key.json | base64\n\
            3. Verify the encoded string doesn't have newlines or spaces\n\
@@ -450,7 +450,7 @@ impl Config {
             ProxyError::Config(format!(
                 "Failed to parse service account key JSON: {}\n\
          \n\
-         💡 To fix this:\n\
+         To fix this:\n\
            1. Verify your service account key is valid JSON\n\
            2. Ensure it contains all required fields:\n\
               - type, project_id, private_key_id, private_key\n\
