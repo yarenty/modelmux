@@ -1,6 +1,26 @@
 # ModelMux - Vertex AI to OpenAI Proxy (Rust)
 
-A high-performance (Rust) proxy server that converts OpenAI-compatible API requests to Vertex AI (Anthropic Claude) format.
+ModelMux is a high-performance Rust gateway that translates OpenAI-compatible API requests to Vertex AI (Claude), with streaming, tool calling, and production-grade reliability.
+
+---
+
+ModelMux is a production-ready, async Rust proxy that acts as a drop-in replacement for the OpenAI API.
+It translates OpenAI-compatible requests into Google Vertex AI (Anthropic Claude) calls while preserving streaming, tool/function calling, and error semantics.
+Designed for performance, safety, and clean architecture, ModelMux is ideal for teams standardizing on OpenAI APIs while running on Vertex AI infrastructure.
+
+
+It supports streaming responses, tool/function calling, and robust error handling, while leveraging Rust’s async ecosystem for safety and performance.
+
+## Why ModelMux?
+
+- 🔁 Drop-in OpenAI replacement — zero client changes
+- ⚡ High performance — async Rust with Tokio
+- 🧠 Full tool/function calling support
+- 📡 Streaming (SSE) compatible
+- 🛡 Strong typing & clean architecture
+- ☁️ Built for Vertex AI (Claude)
+
+*Use ModelMux to standardize on the OpenAI API while keeping full control over your AI backend.*
 
 ## Features
 
