@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integration tests for application initialization (`tests/integration_tests.rs`)
   - Enhanced server tests for client detection and streaming behavior
 - **Test utilities**: Added test helpers and fixtures for consistent testing
-- **Test documentation**: Created `TESTING.md` with comprehensive testing guide
+- **Test documentation**: Created `docs/TESTING.md` with comprehensive testing guide
 
 #### Homebrew Deployment
 - **Homebrew formula**: Created professional Homebrew formula (`packaging/homebrew/modelmux.rb`)
@@ -29,12 +29,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Configuration validation tests
   - Proper base64 encoding for test credentials
 - **Packaging structure**: Organized packaging files into `packaging/homebrew/` directory
-- **Release documentation**: Created `RELEASING.md` with step-by-step release process
+- **Release documentation**: Created `docs/RELEASING.md` with step-by-step release process
 - **Homebrew readiness**: Documented in `HOMEBREW_READINESS.md` with complete checklist
 
 #### Documentation
-- **Release guide**: Added `RELEASING.md` with copy-pasteable release commands
-- **Testing guide**: Added `TESTING.md` with comprehensive testing documentation
+- **Release guide**: Added `docs/RELEASING.md` with copy-pasteable release commands
+- **Testing guide**: Added `docs/TESTING.md` with comprehensive testing documentation
 - **Homebrew guide**: Added `HOMEBREW_READINESS.md` with deployment checklist
 - **Packaging README**: Added `packaging/homebrew/README.md` explaining formula structure
 

@@ -35,7 +35,7 @@ When releasing a new version:
 
 3. Copy to Homebrew tap or homebrew-core
 
-See [../RELEASING.md](../../RELEASING.md) for detailed release instructions.
+See [../../docs/RELEASING.md](../../docs/RELEASING.md) for detailed release instructions.
 
 ## Formula Location
 
@@ -45,5 +45,5 @@ See [../RELEASING.md](../../RELEASING.md) for detailed release instructions.
 
 ## See Also
 
-- [RELEASING.md](../../RELEASING.md) - Release process
+- [docs/RELEASING.md](../../docs/RELEASING.md) - Release process
 - [HOMEBREW_READINESS.md](../../HOMEBREW_READINESS.md) - Readiness checklist
