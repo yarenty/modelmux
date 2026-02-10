@@ -1,4 +1,4 @@
-# typed: true
+# typed: strict
 # frozen_string_literal: true
 
 # ModelMux - high-performance proxy converting OpenAI API to Vertex AI (Claude).
@@ -43,15 +43,15 @@ class Modelmux < Formula
          "-----END PRIVATE KEY-----\n"
     minimal_key = {
       "auth_provider_x509_cert_url" => "https://www.googleapis.com/oauth2/v1/certs",
-      "auth_uri"                     => "https://accounts.google.com/o/oauth2/auth",
-      "client_email"                 => "test@test-project.iam.gserviceaccount.com",
-      "client_id"                    => "123456789",
-      "client_x509_cert_url"         => "https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com",
-      "private_key"                  => pk,
-      "private_key_id"               => "test-key-id",
-      "project_id"                   => "test-project",
-      "token_uri"                    => "https://oauth2.googleapis.com/token",
-      "type"                         => "service_account",
+      "auth_uri"                    => "https://accounts.google.com/o/oauth2/auth",
+      "client_email"                => "test@test-project.iam.gserviceaccount.com",
+      "client_id"                   => "123456789",
+      "client_x509_cert_url"        => "https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com",
+      "private_key"                 => pk,
+      "private_key_id"              => "test-key-id",
+      "project_id"                  => "test-project",
+      "token_uri"                   => "https://oauth2.googleapis.com/token",
+      "type"                        => "service_account",
     }
     key_b64 = Base64.strict_encode64(minimal_key.to_json)
 

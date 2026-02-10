@@ -6,6 +6,7 @@ This directory contains the Homebrew formula for ModelMux.
 
 ```
 packaging/
+  release.sh       # Publish formula to yarenty/tap (copy, commit, push)
   homebrew/
     modelmux.rb    # Homebrew formula
     README.md      # This file
@@ -42,7 +43,13 @@ When releasing a new version:
 
 2. Test locally before submitting
 
-3. Copy to Homebrew tap or homebrew-core
+3. **Release to tap** (from project root):
+   ```bash
+   ./packaging/release.sh
+   ```
+   This copies the formula to `yarenty/tap`, commits, and pushes.
+
+4. Or manually copy to Homebrew tap or homebrew-core
 
 See [../../docs/RELEASING.md](../../docs/RELEASING.md) for detailed release instructions.
 
