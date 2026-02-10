@@ -74,7 +74,7 @@ impl VertexProvider {
     ///
     /// Load Vertex provider from environment.
     ///
-    /// Requires `LLM_PROVIDER=vertex` (or unset). URL from `LLM_PREDICT_URL` or from
+    /// Requires `LLM_PROVIDER=vertex` (or unset). URL from `LLM_URL` or from
     /// `VERTEX_REGION`, `VERTEX_PROJECT`, `VERTEX_LOCATION`, `VERTEX_PUBLISHER`, `VERTEX_MODEL_ID`.
     pub fn from_env() -> Result<Self> {
         let service_account_key = Self::load_service_account_key()?;
@@ -93,7 +93,7 @@ impl VertexProvider {
     }
 
     fn resolve_predict_url_and_model() -> Result<(String, String)> {
-        if let Ok(url) = env::var("LLM_PREDICT_URL") {
+        if let Ok(url) = env::var("LLM_URL") {
             if !url.trim().is_empty() {
                 let resource_url = Self::strip_predict_method_suffix(url.trim());
                 let display = Self::get_model_display_name_override()?;
@@ -108,7 +108,7 @@ impl VertexProvider {
         }
 
         Err(ProxyError::Config(
-            "Vertex URL not configured. Use LLM_PREDICT_URL or set VERTEX_REGION, \
+            "Vertex URL not configured. Use LLM_URL or set VERTEX_REGION, \
              VERTEX_PROJECT, VERTEX_LOCATION, VERTEX_PUBLISHER, VERTEX_MODEL_ID."
                 .to_string(),
         ))
@@ -165,7 +165,7 @@ impl VertexProvider {
                 return Ok(name.trim().to_string());
             }
         }
-        if let Ok(url) = env::var("LLM_PREDICT_URL") {
+        if let Ok(url) = env::var("LLM_URL") {
             let segment = url.trim().rsplit('/').next().unwrap_or("");
             let display = segment.split('@').next().unwrap_or(segment).to_string();
             if !display.is_empty() {
@@ -173,7 +173,7 @@ impl VertexProvider {
             }
         }
         Err(ProxyError::Config(
-            "With LLM_PREDICT_URL set LLM_MODEL or LLM_MODEL_DISPLAY_NAME.".to_string(),
+            "With LLM_URL set LLM_MODEL or LLM_MODEL_DISPLAY_NAME.".to_string(),
         ))
     }
 

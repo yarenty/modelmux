@@ -22,7 +22,7 @@ fn test_missing_required_env_vars() {
     with_vars(
         vec![
             ("GCP_SERVICE_ACCOUNT_KEY", None::<&str>),
-            ("LLM_PREDICT_URL", None::<&str>),
+            ("LLM_URL", None::<&str>),
             ("VERTEX_REGION", None::<&str>),
         ],
         || {
@@ -33,7 +33,7 @@ fn test_missing_required_env_vars() {
                     format!("{}", e).contains("GCP_SERVICE_ACCOUNT_KEY")
                         || format!("{}", e).contains("Predict URL not configured")
                         || format!("{}", e).contains("VERTEX_")
-                        || format!("{}", e).contains("LLM_PREDICT_URL"),
+                        || format!("{}", e).contains("LLM_URL"),
                     "Error should mention missing configuration"
                 );
             }
@@ -44,7 +44,7 @@ fn test_missing_required_env_vars() {
 fn vertex_test_vars(key_b64: &str) -> Vec<(&'static str, Option<&str>)> {
     vec![
         ("GCP_SERVICE_ACCOUNT_KEY", Some(key_b64)),
-        ("LLM_PREDICT_URL", None::<&str>),
+        ("LLM_URL", None::<&str>),
         ("LLM_PROVIDER", Some("vertex")),
         ("VERTEX_REGION", Some("test-region")),
         ("VERTEX_PROJECT", Some("test-project")),

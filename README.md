@@ -125,24 +125,22 @@ modelmux = "0.2"
 Create a `.env` file:
 
 ```env
-# Required: Base64-encoded Google Cloud service account key
+# Either set full URL (overrides provider-specific fields):
+# LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/MY_PROJECT/locations/europe-west1/publishers/anthropic/models/claude-sonnet-4@20250514"
+
+# Or set Vertex-specific fields (LLM_PROVIDER=vertex):
+LLM_PROVIDER=vertex
 GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
+VERTEX_REGION=europe-west1
+VERTEX_PROJECT=my-gcp-project
+VERTEX_LOCATION=europe-west1
+VERTEX_PUBLISHER=anthropic
+VERTEX_MODEL_ID=claude-sonnet-4@20250514
 
-# Required: Vertex AI configuration
-LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/<your_project>/locations/<your_location>/publishers/"
-LLM_CHAT_ENDPOINT="<your_model>:streamRawPredict"
-LLM_MODEL="claude-sonnet-4"
-
-# Optional: Server configuration
+# Optional: Server and streaming
 PORT=3000
-LOG_LEVEL=info  # trace, debug, info, warn, error
-
-# Optional: Streaming configuration
-STREAMING_MODE=auto  # auto, non-streaming, standard, buffered
-
-# Optional: Retry configuration
-ENABLE_RETRIES=true
-MAX_RETRY_ATTEMPTS=3
+LOG_LEVEL=info
+STREAMING_MODE=auto
 ```
 
 ### 2. Run ModelMux
@@ -174,18 +172,20 @@ That's it! Your OpenAI code now talks to Vertex AI.
 ### Environment Variables
 
 ```bash
-# Required Configuration
+# Either LLM_URL (full resource URL) or Vertex-specific:
+# export LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/.../models/claude-sonnet-4@20250514"
+export LLM_PROVIDER=vertex
 export GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
-export LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/..."
-export LLM_CHAT_ENDPOINT="your-chat-endpoint"
-export LLM_MODEL="claude-sonnet-4"
+export VERTEX_REGION=europe-west1
+export VERTEX_PROJECT=my-gcp-project
+export VERTEX_LOCATION=europe-west1
+export VERTEX_PUBLISHER=anthropic
+export VERTEX_MODEL_ID=claude-sonnet-4@20250514
 
-# Optional Configuration
+# Optional
 export PORT=3000
-export LOG_LEVEL=info                    # trace, debug, info, warn, error
-export STREAMING_MODE=auto               # auto, non-streaming, standard, buffered
-export ENABLE_RETRIES=true
-export MAX_RETRY_ATTEMPTS=3
+export LOG_LEVEL=info
+export STREAMING_MODE=auto
 ```
 
 <!-- "Time flies like an arrow; fruit flies like a banana." - Groucho Marx -->

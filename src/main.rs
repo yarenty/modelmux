@@ -44,7 +44,7 @@
 //! # Required: Base64-encoded Google Cloud service account key
 //! export GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
 //!
-//! # Predict URL: use LLM_PREDICT_URL (full resource URL) or Vertex vars
+//! # Provider: use LLM_URL (full resource URL) or provider-specific fields (e.g. Vertex: GCP_SERVICE_ACCOUNT_KEY, VERTEX_*)
 //! export LLM_PROVIDER=vertex
 //! export VERTEX_REGION=europe-west1
 //! export VERTEX_PROJECT=my-project
@@ -219,19 +219,6 @@ fn print_help() {
     println!("    -V, --version       Print version information");
     println!();
     println!("ENVIRONMENT VARIABLES:");
-    println!(
-        "    GCP_SERVICE_ACCOUNT_KEY    Base64-encoded Google Cloud service account key (required)"
-    );
-    println!();
-    println!("    Predict URL (use one of the following):");
-    println!("    LLM_PREDICT_URL             Full resource URL (no :rawPredict/:streamRawPredict suffix)");
-    println!("    -- or Vertex (LLM_PROVIDER=vertex):");
-    println!("    VERTEX_REGION               e.g. europe-west1");
-    println!("    VERTEX_PROJECT              GCP project ID");
-    println!("    VERTEX_LOCATION             e.g. europe-west1");
-    println!("    VERTEX_PUBLISHER            e.g. anthropic");
-    println!("    VERTEX_MODEL_ID             e.g. claude-sonnet-4@20250514");
-    println!("    LLM_MODEL_DISPLAY_NAME      Optional; else derived from model id");
     println!("    PORT                       Server port (default: 3000)");
     println!(
         "    LOG_LEVEL                  Log level: trace, debug, info, warn, error (default: info)"
@@ -239,6 +226,20 @@ fn print_help() {
     println!(
         "    STREAMING_MODE             Streaming mode: auto, non-streaming, standard, buffered (default: auto)"
     );
+    println!();
+    println!("  Provider / model configuration:");
+    println!("    LLM_PROVIDER               Backend: vertex (default) or openai_compatible (future)");
+    println!();
+    println!("    Either set a single override (ignores provider-specific fields):");
+    println!("    LLM_URL                    Full resource URL (no :rawPredict/:streamRawPredict suffix)");
+    println!();
+    println!("    Or set provider-specific fields. For Vertex (LLM_PROVIDER=vertex):");
+    println!("    GCP_SERVICE_ACCOUNT_KEY    Base64-encoded Google Cloud service account key (required)");
+    println!("    VERTEX_REGION              e.g. europe-west1");
+    println!("    VERTEX_PROJECT             GCP project ID");
+    println!("    VERTEX_LOCATION            e.g. europe-west1");
+    println!("    VERTEX_PUBLISHER           e.g. anthropic");
+    println!("    VERTEX_MODEL_ID            e.g. claude-sonnet-4@20250514");
     println!();
     println!("EXAMPLES:");
     println!("    modelmux                    Start the proxy server");
@@ -331,7 +332,7 @@ fn run_doctor() {
             println!("     {}", e);
             println!();
             println!("Suggestions:");
-            println!("   • Use either LLM_PREDICT_URL (full resource URL) or Vertex vars (VERTEX_REGION, VERTEX_PROJECT, etc.)");
+            println!("   • Use either LLM_URL (full resource URL) or Vertex-specific fields (GCP_SERVICE_ACCOUNT_KEY, VERTEX_*)");
             println!("   • Ensure GCP_SERVICE_ACCOUNT_KEY is set (base64-encoded JSON key)");
             println!("   • Run 'modelmux --help' for full environment variable reference");
         }

@@ -133,7 +133,7 @@ fn test_doctor_command() {
         || combined.contains("Variables")
         || combined.contains("Failed to load configuration")
         || combined.contains("Vertex")
-        || combined.contains("LLM_PREDICT_URL")
+        || combined.contains("LLM_URL")
         || combined.contains("VERTEX_")
         || combined.contains("GCP_SERVICE_ACCOUNT")
         || combined.contains("Failed to bind to port")
@@ -179,7 +179,7 @@ fn test_validate_command() {
         || combined.contains("[ERROR]")
         || combined.contains("[OK]")
         || combined.contains("Vertex")
-        || combined.contains("LLM_PREDICT_URL")
+        || combined.contains("LLM_URL")
         || combined.contains("GCP_SERVICE_ACCOUNT");
     assert!(
         has_result,

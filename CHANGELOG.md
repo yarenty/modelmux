@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **LLM provider abstraction**: Configuration is driven by `LLM_PROVIDER`; only the selected backend is loaded.
 - **`LlmProviderBackend` trait**: All backends implement `id()`, `build_request_url()`, `display_model_name()`, `auth_strategy()`.
-- **Vertex provider**: Supports either full URL override (`LLM_PREDICT_URL`) or Google-docs-style vars (`VERTEX_REGION`, `VERTEX_PROJECT`, `VERTEX_LOCATION`, `VERTEX_PUBLISHER`, `VERTEX_MODEL_ID`).
+- **Vertex provider**: Supports either full URL override (`LLM_URL`) or Google-docs-style vars (`VERTEX_REGION`, `VERTEX_PROJECT`, `VERTEX_LOCATION`, `VERTEX_PUBLISHER`, `VERTEX_MODEL_ID`).
 - **OpenAI-compatible provider stub**: Template for future Mistral/OpenAI-compatible backends (not yet implemented).
 - **`AuthStrategy`**: `GcpOAuth2(ServiceAccountKey)` or `BearerToken(String)` per provider.
 - **`RequestAuth`**: Unified request auth (GCP or Bearer); server uses it for the `Authorization` header.
@@ -19,12 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Config**: Replaced flat `predict_resource_url` / `llm_model` / `service_account_key` with `llm_provider: LlmProviderConfig`. `build_predict_url()` and `llm_model()` delegate to the provider.
-- **.env**: Use `LLM_PROVIDER=vertex` and either `LLM_PREDICT_URL` or Vertex vars. See `.env.example`.
+- **.env**: Use `LLM_PROVIDER=vertex` and either `LLM_URL` or Vertex vars. See `.env.example`.
 
 ### Documentation
 
 - **Help / doctor**: Updated to describe only override and Vertex config.
-- **.env.example**: Shows Vertex vars and optional `LLM_PREDICT_URL` override.
+- **.env.example**: Shows Vertex vars and optional `LLM_URL` override.
 
 ---
 
