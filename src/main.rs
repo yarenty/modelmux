@@ -80,6 +80,7 @@
 
 /* --- uses ------------------------------------------------------------------------------------ */
 
+use std::env;
 use std::sync::Arc;
 
 use axum::Router;
@@ -119,6 +120,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 ///  * `ProxyError` if initialization or server startup fails
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Handle CLI arguments before config loading
+    handle_cli_args();
+
     let config = initialize_config()?;
     initialize_logging(&config);
 
@@ -126,6 +130,59 @@ async fn main() -> Result<()> {
     let app = create_router(app_state);
 
     start_server(&config, app).await
+}
+
+///
+/// Handle command line arguments like --version and --help before config loading.
+///
+/// This ensures these commands work even without proper configuration.
+fn handle_cli_args() {
+    let args: Vec<String> = env::args().collect();
+
+    for arg in &args[1..] {
+        match arg.as_str() {
+            "--version" | "-V" => {
+                println!("modelmux {}", VERSION);
+                std::process::exit(0);
+            }
+            "--help" | "-h" => {
+                print_help();
+                std::process::exit(0);
+            }
+            _ => {}
+        }
+    }
+}
+
+///
+/// Print help information for the ModelMux CLI.
+fn print_help() {
+    println!("ModelMux v{}", VERSION);
+    println!("High-performance proxy server converting OpenAI API requests to Vertex AI format");
+    println!();
+    println!("USAGE:");
+    println!("    modelmux [OPTIONS]");
+    println!();
+    println!("OPTIONS:");
+    println!("    -h, --help       Print help information");
+    println!("    -V, --version    Print version information");
+    println!();
+    println!("ENVIRONMENT VARIABLES:");
+    println!(
+        "    GCP_SERVICE_ACCOUNT_KEY    Base64-encoded Google Cloud service account key (required)"
+    );
+    println!("    LLM_URL                    Vertex AI base URL (required)");
+    println!("    LLM_CHAT_ENDPOINT         Chat endpoint path (required)");
+    println!("    LLM_MODEL                 Model identifier (required)");
+    println!("    PORT                      Server port (default: 3000)");
+    println!(
+        "    LOG_LEVEL                 Log level: trace, debug, info, warn, error (default: info)"
+    );
+    println!(
+        "    STREAMING_MODE            Streaming mode: auto, non-streaming, standard, buffered (default: auto)"
+    );
+    println!();
+    println!("For more information, visit: https://github.com/yarenty/modelmux");
 }
 
 ///
