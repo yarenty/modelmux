@@ -79,3 +79,12 @@ tokio-test = "0.4"
 base64 = "0.22"
 reqwest = { version = "0.13", features = ["json"] }
 temp-env = "0.3"
+
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
