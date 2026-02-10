@@ -21,3 +21,4 @@ install
 install.log
 install.tar.gz
 /Cargo.lock
+/.env
