@@ -9,8 +9,6 @@ It translates OpenAI-compatible requests into Google Vertex AI (Anthropic Claude
 Designed for performance, safety, and clean architecture, ModelMux is ideal for teams standardizing on OpenAI APIs while running on Vertex AI infrastructure.
 
 
-It supports streaming responses, tool/function calling, and robust error handling, while leveraging Rust’s async ecosystem for safety and performance.
-
 ## Why ModelMux?
 
 - 🔁 Drop-in OpenAI replacement — zero client changes
@@ -47,9 +45,9 @@ Create a `.env` file in the project root:
 # Required: Base64-encoded Google Cloud service account key
 GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
 
-# Optional: Vertex AI configuration
+# Required: Vertex AI configuration
 LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/<your_project>/locations/<your_location>/publishers/"
-LLM_CHAT_ENDPOINT=<your_model>:streamRawPredict"
+LLM_CHAT_ENDPOINT="<your_model>:streamRawPredict"
 LLM_MODEL="claude-sonnet-4"
 
 # Optional: Server configuration

@@ -44,8 +44,9 @@
 //! # Required: Base64-encoded Google Cloud service account key
 //! export GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
 //!
-//! # Optional: Vertex AI configuration
+//! # Required: Vertex AI configuration
 //! export LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/..."
+//! export LLM_CHAT_ENDPOINT="your-chat-endpoint"
 //! export LLM_MODEL="claude-sonnet-4"
 //!
 //! # Optional: Server configuration

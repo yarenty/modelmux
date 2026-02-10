@@ -211,9 +211,9 @@ impl Config {
         let _ = dotenvy::dotenv();
 
         let service_account_key = Self::load_service_account_key()?;
-        let llm_url = Self::get_llm_url();
-        let llm_chat_endpoint = Self::get_llm_chat_endpoint();
-        let llm_model = Self::get_llm_model();
+        let llm_url = Self::get_llm_url()?;
+        let llm_chat_endpoint = Self::get_llm_chat_endpoint()?;
+        let llm_model = Self::get_llm_model()?;
         let port = Self::get_port()?;
         let log_level = Self::get_log_level();
         let enable_retries = Self::get_enable_retries();
@@ -267,44 +267,65 @@ impl Config {
     fn load_service_account_key() -> Result<ServiceAccountKey> {
         let service_account_key_b64 = env::var("GCP_SERVICE_ACCOUNT_KEY").map_err(|_| {
             ProxyError::Config(
-        "GCP_SERVICE_ACCOUNT_KEY environment variable is not set. Please set it in your \
+                "GCP_SERVICE_ACCOUNT_KEY environment variable is not set. Please set it in your \
          environment or create a .env file with: \
          GCP_SERVICE_ACCOUNT_KEY=\"your-base64-encoded-key\""
-          .to_string(),
-      )
+                    .to_string(),
+            )
         })?;
 
         Self::decode_service_account_key(&service_account_key_b64)
     }
 
     ///
-    /// Get the LLM base URL from environment or use default.
+    /// Get the LLM base URL from environment.
     ///
     /// # Returns
     ///  * LLM base URL string
-    fn get_llm_url() -> String {
-        env::var("LLM_URL")
-      .unwrap_or_else(|_| "https://europe-west1-aiplatform.googleapis.com/v1/projects/basebox-llm-api/locations/europe-west1/publishers/".to_string())
-    }
-
-    ///
-    /// Get the LLM chat endpoint from environment or use default.
-    ///
-    /// # Returns
-    ///  * LLM chat endpoint string
-    fn get_llm_chat_endpoint() -> String {
-        env::var("LLM_CHAT_ENDPOINT").unwrap_or_else(|_| {
-            "anthropic/models/claude-sonnet-4@20250514:streamRawPredict".to_string()
+    ///  * `ProxyError::Config` if LLM_URL is not set
+    fn get_llm_url() -> Result<String> {
+        env::var("LLM_URL").map_err(|_| {
+            ProxyError::Config(
+                "LLM_URL environment variable is not set. Please set it in your \
+                 environment or create a .env file with: \
+                 LLM_URL=\"your-vertex-ai-url\""
+                    .to_string(),
+            )
         })
     }
 
     ///
-    /// Get the LLM model identifier from environment or use default.
+    /// Get the LLM chat endpoint from environment.
+    ///
+    /// # Returns
+    ///  * LLM chat endpoint string
+    ///  * `ProxyError::Config` if LLM_CHAT_ENDPOINT is not set
+    fn get_llm_chat_endpoint() -> Result<String> {
+        env::var("LLM_CHAT_ENDPOINT").map_err(|_| {
+            ProxyError::Config(
+                "LLM_CHAT_ENDPOINT environment variable is not set. Please set it in your \
+                 environment or create a .env file with: \
+                 LLM_CHAT_ENDPOINT=\"your-chat-endpoint\""
+                    .to_string(),
+            )
+        })
+    }
+
+    ///
+    /// Get the LLM model identifier from environment.
     ///
     /// # Returns
     ///  * LLM model identifier string
-    fn get_llm_model() -> String {
-        env::var("LLM_MODEL").unwrap_or_else(|_| "claude-sonnet-4".to_string())
+    ///  * `ProxyError::Config` if LLM_MODEL is not set
+    fn get_llm_model() -> Result<String> {
+        env::var("LLM_MODEL").map_err(|_| {
+            ProxyError::Config(
+                "LLM_MODEL environment variable is not set. Please set it in your \
+                 environment or create a .env file with: \
+                 LLM_MODEL=\"your-model-name\""
+                    .to_string(),
+            )
+        })
     }
 
     ///
@@ -336,10 +357,7 @@ impl Config {
     /// # Returns
     ///  * Whether retries are enabled
     fn get_enable_retries() -> bool {
-        env::var("ENABLE_RETRIES")
-            .unwrap_or_else(|_| "true".to_string())
-            .parse()
-            .unwrap_or(true)
+        env::var("ENABLE_RETRIES").unwrap_or_else(|_| "true".to_string()).parse().unwrap_or(true)
     }
 
     ///
@@ -348,10 +366,7 @@ impl Config {
     /// # Returns
     ///  * Maximum retry attempts
     fn get_max_retry_attempts() -> u32 {
-        env::var("MAX_RETRY_ATTEMPTS")
-            .unwrap_or_else(|_| "3".to_string())
-            .parse()
-            .unwrap_or(3)
+        env::var("MAX_RETRY_ATTEMPTS").unwrap_or_else(|_| "3".to_string()).parse().unwrap_or(3)
     }
 
     ///
