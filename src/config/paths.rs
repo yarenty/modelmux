@@ -44,9 +44,14 @@ const ORG_NAME: &str = "SkyCorp";
 /// * `Err(ProxyError)` - Unable to determine or create config directory
 ///
 /// # Examples
-/// ```rust
-/// let config_dir = modelmux::config::paths::user_config_dir()?;
+/// ```rust,no_run
+/// use modelmux::config::paths::user_config_dir;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let config_dir = user_config_dir()?;
 /// let config_file = config_dir.join("config.toml");
+/// # Ok(())
+/// # }
 /// ```
 pub fn user_config_dir() -> Result<PathBuf> {
     let project_dirs = get_project_dirs()?;
@@ -187,9 +192,14 @@ pub fn default_service_account_file() -> Result<PathBuf> {
 /// * `Err(ProxyError)` - Path expansion failed
 ///
 /// # Examples
-/// ```rust
+/// ```rust,no_run
+/// use modelmux::config::paths::expand_path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let expanded = expand_path("~/.config/modelmux/config.toml")?;
 /// let expanded = expand_path("$HOME/.config/modelmux/config.toml")?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn expand_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
     let path_str = path.as_ref().to_string_lossy();

@@ -299,11 +299,14 @@ impl Config {
     /// * `Err(ProxyError)` - Configuration loading or validation failed
     ///
     /// # Examples
-    /// ```rust
+    /// ```rust,no_run
     /// use modelmux::config::Config;
     ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let config = Config::load()?;
     /// println!("Server will run on port {}", config.server.port);
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn load() -> Result<Self> {
         // First load using the new system for most settings

@@ -54,12 +54,17 @@ impl ConfigLoader {
     /// * ConfigLoader instance ready for configuration building
     ///
     /// # Examples
-    /// ```rust
+    /// ```rust,no_run
+    /// use modelmux::config::loader::ConfigLoader;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let config = ConfigLoader::new()
     ///     .with_defaults()
     ///     .with_user_config()?
     ///     .with_env_vars()?
-    ///     .build()?;
+    ///     .build_base()?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new() -> Self {
         Self { config: Config::default(), env_overrides: HashMap::new(), defaults_applied: false }
