@@ -314,8 +314,11 @@ impl Config {
             .with_env_vars()?
             .build_base()?;
 
-        // Then load provider config using existing system
-        base_config.llm_provider = Some(LlmProviderConfig::from_env()?);
+        // Load service account key from auth config to avoid circular dependency
+        let service_account_key = Self::load_service_account_key_from_auth(&base_config.auth)?;
+
+        // Then load provider config with the service account key
+        base_config.llm_provider = Some(LlmProviderConfig::from_env_with_key(service_account_key)?);
 
         Ok(base_config)
     }
@@ -335,9 +338,77 @@ impl Config {
 
     /// Legacy method for loading service account key (for backward compatibility)
     pub fn load_service_account_key_standalone() -> Result<ServiceAccountKey> {
-        // Load a config and extract the service account
-        let config = Self::load()?;
-        config.load_service_account_key()
+        // Load auth config directly to avoid circular dependency
+        let auth_config =
+            loader::ConfigLoader::new().with_defaults().with_env_vars()?.build_base()?.auth;
+        Self::load_service_account_key_from_auth(&auth_config)
+    }
+
+    /// Load service account key from provided auth config (to avoid circular dependency)
+    pub fn load_service_account_key_from_auth(auth: &AuthConfig) -> Result<ServiceAccountKey> {
+        if let Some(ref json_str) = auth.service_account_json {
+            // Load from inline JSON
+            serde_json::from_str(json_str).map_err(|e| {
+                ProxyError::Config(format!(
+                    "Failed to parse inline service account JSON: {}\n\
+                     \n\
+                     The JSON appears to be malformed. Please verify:\n\
+                     1. All required fields are present\n\
+                     2. JSON syntax is valid\n\
+                     3. No extra commas or missing quotes\n\
+                     \n\
+                     Run 'modelmux config validate' for more details.",
+                    e
+                ))
+            })
+        } else if let Some(ref file_path) = auth.service_account_file {
+            // Load from file
+            let expanded_path = paths::expand_path(file_path)?;
+            let file_contents = std::fs::read_to_string(&expanded_path).map_err(|e| {
+                ProxyError::Config(format!(
+                    "Failed to read service account file '{}': {}\n\
+                     \n\
+                     To fix this:\n\
+                     1. Verify the file exists and is readable\n\
+                     2. Check file permissions (should be 600 or similar)\n\
+                     3. Ensure the path is correct\n\
+                     \n\
+                     Example:\n\
+                       ls -la '{}'\n\
+                       chmod 600 '{}'",
+                    expanded_path.display(),
+                    e,
+                    expanded_path.display(),
+                    expanded_path.display()
+                ))
+            })?;
+
+            serde_json::from_str(&file_contents).map_err(|e| {
+                ProxyError::Config(format!(
+                    "Failed to parse service account file '{}': {}\n\
+                     \n\
+                     The file appears to contain invalid JSON. Please verify:\n\
+                     1. The file was downloaded correctly from Google Cloud\n\
+                     2. No extra characters or modifications were made\n\
+                     3. The file is a valid service account key JSON\n\
+                     \n\
+                     Run 'modelmux config validate' for more details.",
+                    expanded_path.display(),
+                    e
+                ))
+            })
+        } else {
+            Err(ProxyError::Config(
+                "No service account configuration found.\n\
+                 \n\
+                 Please configure either:\n\
+                 1. auth.service_account_file = \"/path/to/service-account.json\"\n\
+                 2. auth.service_account_json = \"{ ... }\" (inline JSON)\n\
+                 \n\
+                 Run 'modelmux config init' for interactive setup."
+                    .to_string(),
+            ))
+        }
     }
 
     /// Validate the current configuration
@@ -363,76 +434,7 @@ impl Config {
     /// * `Ok(ServiceAccountKey)` - Successfully loaded and parsed key
     /// * `Err(ProxyError)` - Key loading or parsing failed
     pub fn load_service_account_key(&self) -> Result<ServiceAccountKey> {
-        if let Some(ref json_str) = self.auth.service_account_json {
-            // Load from inline JSON
-            serde_json::from_str(json_str).map_err(|e| {
-                ProxyError::Config(format!(
-                    "Failed to parse inline service account JSON: {}\n\
-                     \n\
-                     The JSON appears to be malformed. Please verify:\n\
-                     1. All required fields are present\n\
-                     2. JSON syntax is valid\n\
-                     3. No extra commas or missing quotes\n\
-                     \n\
-                     Run 'modelmux config validate' for more details.",
-                    e
-                ))
-            })
-        } else if let Some(ref file_path) = self.auth.service_account_file {
-            // Load from file
-            let expanded_path = paths::expand_path(file_path)?;
-            let file_contents = std::fs::read_to_string(&expanded_path).map_err(|e| {
-                ProxyError::Config(format!(
-                    "Failed to read service account file '{}': {}\n\
-                     \n\
-                     To fix this:\n\
-                     1. Verify the file exists and is readable\n\
-                     2. Check file permissions (should be readable by current user)\n\
-                     3. Ensure the path is correct (supports ~ expansion)\n\
-                     \n\
-                     Example setup:\n\
-                       mkdir -p ~/.config/modelmux\n\
-                       cp /path/to/service-account.json ~/.config/modelmux/\n\
-                       chmod 600 ~/.config/modelmux/service-account.json\n\
-                     \n\
-                     Run 'modelmux config init' to set up configuration interactively.",
-                    expanded_path.display(),
-                    e
-                ))
-            })?;
-
-            serde_json::from_str(&file_contents).map_err(|e| {
-                ProxyError::Config(format!(
-                    "Failed to parse service account file '{}': {}\n\
-                     \n\
-                     The JSON file appears to be malformed. Please verify:\n\
-                     1. File contains valid Google Cloud service account JSON\n\
-                     2. All required fields are present (type, project_id, private_key, etc.)\n\
-                     3. File was downloaded correctly from Google Cloud Console\n\
-                     \n\
-                     You can download a fresh service account key from:\n\
-                     https://console.cloud.google.com/iam-admin/serviceaccounts\n\
-                     \n\
-                     Run 'modelmux config validate' for more details.",
-                    expanded_path.display(),
-                    e
-                ))
-            })
-        } else {
-            Err(ProxyError::Config(
-                "No service account configuration found.\n\
-                 \n\
-                 Please configure authentication by setting either:\n\
-                 1. service_account_file = \"/path/to/service-account.json\"\n\
-                 2. service_account_json = \"{ ... }\" (inline JSON)\n\
-                 \n\
-                 In your configuration file or environment variables:\n\
-                   MODELMUX_AUTH_SERVICE_ACCOUNT_FILE=/path/to/key.json\n\
-                 \n\
-                 Run 'modelmux config init' to set up configuration interactively."
-                    .to_string(),
-            ))
-        }
+        Self::load_service_account_key_from_auth(&self.auth)
     }
 
     /// Get configuration file example as TOML string

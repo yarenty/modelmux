@@ -81,11 +81,19 @@ impl VertexProvider {
         let (predict_resource_url, display_model) = Self::resolve_predict_url_and_model()?;
         let auth = AuthStrategy::GcpOAuth2(service_account_key);
 
-        Ok(Self {
-            predict_resource_url,
-            display_model,
-            auth,
-        })
+        Ok(Self { predict_resource_url, display_model, auth })
+    }
+
+    ///
+    /// Load Vertex provider with provided service account key (to avoid circular dependency).
+    ///
+    /// Requires `LLM_PROVIDER=vertex` (or unset). URL from `LLM_URL` or from
+    /// `VERTEX_REGION`, `VERTEX_PROJECT`, `VERTEX_LOCATION`, `VERTEX_PUBLISHER`, `VERTEX_MODEL_ID`.
+    pub fn from_env_with_key(service_account_key: ServiceAccountKey) -> Result<Self> {
+        let (predict_resource_url, display_model) = Self::resolve_predict_url_and_model()?;
+        let auth = AuthStrategy::GcpOAuth2(service_account_key);
+
+        Ok(Self { predict_resource_url, display_model, auth })
     }
 
     fn load_service_account_key() -> Result<ServiceAccountKey> {
@@ -172,9 +180,7 @@ impl VertexProvider {
                 return Ok(display);
             }
         }
-        Err(ProxyError::Config(
-            "With LLM_URL set LLM_MODEL or LLM_MODEL_DISPLAY_NAME.".to_string(),
-        ))
+        Err(ProxyError::Config("With LLM_URL set LLM_MODEL or LLM_MODEL_DISPLAY_NAME.".to_string()))
     }
 
     fn get_model_display_name_vertex() -> Result<String> {
@@ -195,7 +201,8 @@ impl VertexProvider {
             }
         }
         Err(ProxyError::Config(
-            "Set LLM_MODEL, LLM_MODEL_DISPLAY_NAME, or VERTEX_MODEL_ID for display name.".to_string(),
+            "Set LLM_MODEL, LLM_MODEL_DISPLAY_NAME, or VERTEX_MODEL_ID for display name."
+                .to_string(),
         ))
     }
 }
@@ -237,13 +244,13 @@ impl OpenAiCompatibleProvider {
     ///
     /// Build from explicit values (for when from_env is implemented).
     #[allow(dead_code)]
-    pub fn new(base_url: String, chat_path: String, display_model: String, auth: AuthStrategy) -> Self {
-        Self {
-            _base_url: base_url,
-            _chat_path: chat_path,
-            _display_model: display_model,
-            auth,
-        }
+    pub fn new(
+        base_url: String,
+        chat_path: String,
+        display_model: String,
+        auth: AuthStrategy,
+    ) -> Self {
+        Self { _base_url: base_url, _chat_path: chat_path, _display_model: display_model, auth }
     }
 
     ///
@@ -304,6 +311,25 @@ impl LlmProviderConfig {
         let id = id.trim().to_lowercase();
         match id.as_str() {
             "vertex" => VertexProvider::from_env().map(Self::Vertex),
+            "openai_compatible" | "openai" | "mistral" | "cloudflare" => {
+                OpenAiCompatibleProvider::from_env().map(Self::OpenAiCompatible)
+            }
+            _ => Err(ProxyError::Config(format!(
+                "Unknown LLM_PROVIDER: '{}'. Supported: vertex, openai_compatible",
+                id
+            ))),
+        }
+    }
+
+    ///
+    /// Load the provider config with provided service account key (to avoid circular dependency).
+    ///
+    /// Defaults to `vertex` when unset. Supported: `vertex`, `openai_compatible` (stub).
+    pub fn from_env_with_key(service_account_key: ServiceAccountKey) -> Result<Self> {
+        let id = env::var("LLM_PROVIDER").unwrap_or_else(|_| "vertex".to_string());
+        let id = id.trim().to_lowercase();
+        match id.as_str() {
+            "vertex" => VertexProvider::from_env_with_key(service_account_key).map(Self::Vertex),
             "openai_compatible" | "openai" | "mistral" | "cloudflare" => {
                 OpenAiCompatibleProvider::from_env().map(Self::OpenAiCompatible)
             }

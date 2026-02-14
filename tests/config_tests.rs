@@ -15,8 +15,10 @@ fn test_config_load_with_required_vars() {
         vec![
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -35,8 +37,10 @@ fn test_default_port() {
         vec![
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -54,8 +58,10 @@ fn test_custom_port() {
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("MODELMUX_SERVER_PORT", Some("8080")),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -73,8 +79,10 @@ fn test_invalid_port() {
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("MODELMUX_SERVER_PORT", Some("99999")), // Invalid port number
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -94,8 +102,10 @@ fn test_log_level_parsing() {
                 ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
                 ("MODELMUX_SERVER_LOG_LEVEL", Some(level)),
                 ("LLM_PROVIDER", Some("vertex")),
+                ("VERTEX_REGION", Some("us-central1")),
                 ("VERTEX_PROJECT", Some("test-project")),
                 ("VERTEX_LOCATION", Some("us-central1")),
+                ("VERTEX_PUBLISHER", Some("anthropic")),
                 ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
             ],
             || {
@@ -117,8 +127,10 @@ fn test_default_log_level() {
         vec![
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -144,8 +156,10 @@ fn test_streaming_mode_parsing() {
                 ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
                 ("MODELMUX_STREAMING_MODE", Some(mode_str)),
                 ("LLM_PROVIDER", Some("vertex")),
+                ("VERTEX_REGION", Some("us-central1")),
                 ("VERTEX_PROJECT", Some("test-project")),
                 ("VERTEX_LOCATION", Some("us-central1")),
+                ("VERTEX_PUBLISHER", Some("anthropic")),
                 ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
             ],
             || {
@@ -167,8 +181,10 @@ fn test_default_streaming_mode() {
         vec![
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -191,8 +207,10 @@ fn test_retry_config() {
             ("MODELMUX_SERVER_ENABLE_RETRIES", Some("false")),
             ("MODELMUX_SERVER_MAX_RETRY_ATTEMPTS", Some("5")),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -210,8 +228,10 @@ fn test_default_retry_config() {
         vec![
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -231,8 +251,10 @@ fn test_config_fails_without_auth() {
     with_vars(
         vec![
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
@@ -273,8 +295,10 @@ fn test_build_predict_url() {
         vec![
             ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
             ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_REGION", Some("us-central1")),
             ("VERTEX_PROJECT", Some("test-project")),
             ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_PUBLISHER", Some("anthropic")),
             ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {

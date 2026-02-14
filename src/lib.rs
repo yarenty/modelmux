@@ -12,7 +12,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Load configuration
-//!     let config = Config::from_env()?;
+//!     let config = Config::load()?;
 //!
 //!     // Create the application
 //!     let app = create_app(config).await?;
@@ -70,7 +70,7 @@ pub use error::ProxyError;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let config = Config::from_env()?;
+///     let config = Config::load()?;
 ///     let app = create_app(config).await?;
 ///
 ///     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
