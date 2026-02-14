@@ -22,7 +22,6 @@
 use crate::config::paths;
 use crate::config::{AuthConfig, Config, LogLevel, ServerConfig, StreamingConfig, StreamingMode};
 use crate::error::{ProxyError, Result};
-use crate::provider::LlmProviderConfig;
 
 use std::collections::HashMap;
 use std::env;

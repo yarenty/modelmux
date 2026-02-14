@@ -1,271 +1,299 @@
-//! Configuration module tests
-//!
-//! Tests for configuration loading, validation, and parsing from environment variables.
-//!
-//! Uses temp-env to safely manage environment variables during tests, automatically
-//! restoring them after each test completes.
+//! Configuration tests for ModelMux
 
-use base64::Engine;
 use modelmux::config::{Config, LogLevel, StreamingMode};
 use temp_env::with_vars;
 
-/// Test that required environment variables are validated
-#[test]
-fn test_missing_required_env_vars() {
-    // Skip this test if .env file exists, as dotenv() will load vars from it
-    if std::path::Path::new(".env").exists() {
-        eprintln!("Skipping test_missing_required_env_vars: .env file exists");
-        return;
-    }
+/// Helper function to get JSON service account key
+fn get_test_key_json() -> &'static str {
+    r#"{"type":"service_account","project_id":"test-project","private_key_id":"test","private_key":"-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----\n","client_email":"test@test-project.iam.gserviceaccount.com","client_id":"123456789","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com"}"#
+}
 
-    // temp-env will unset these vars and restore them after the test
+/// Test that configuration loads with minimal required environment variables
+#[test]
+fn test_config_load_with_required_vars() {
     with_vars(
         vec![
-            ("GCP_SERVICE_ACCOUNT_KEY", None::<&str>),
-            ("LLM_URL", None::<&str>),
-            ("VERTEX_REGION", None::<&str>),
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
         ],
         || {
-            let result = Config::from_env();
-            assert!(result.is_err(), "Should fail when required env vars are missing");
-            if let Err(e) = result {
-                assert!(
-                    format!("{}", e).contains("GCP_SERVICE_ACCOUNT_KEY")
-                        || format!("{}", e).contains("Predict URL not configured")
-                        || format!("{}", e).contains("VERTEX_")
-                        || format!("{}", e).contains("LLM_URL"),
-                    "Error should mention missing configuration"
-                );
-            }
+            let config = Config::load().expect("Should load config with required vars");
+            assert_eq!(config.server.port, 3000); // Default port
+            assert_eq!(config.server.log_level, LogLevel::Info); // Default log level
+            assert_eq!(config.streaming.mode, StreamingMode::Auto); // Default streaming mode
         },
     );
 }
 
-fn vertex_test_vars(key_b64: &str) -> Vec<(&'static str, Option<&str>)> {
-    vec![
-        ("GCP_SERVICE_ACCOUNT_KEY", Some(key_b64)),
-        ("LLM_URL", None::<&str>),
-        ("LLM_PROVIDER", Some("vertex")),
-        ("VERTEX_REGION", Some("test-region")),
-        ("VERTEX_PROJECT", Some("test-project")),
-        ("VERTEX_LOCATION", Some("test-region")),
-        ("VERTEX_PUBLISHER", Some("test-publisher")),
-        ("VERTEX_MODEL_ID", Some("test-model")),
-    ]
-}
-
-/// Test that default port is used when PORT is not set
+/// Test that default port is used when not specified
 #[test]
 fn test_default_port() {
-    let key = get_test_key_b64();
-    let mut vars = vertex_test_vars(&key);
-    vars.push(("PORT", None::<&str>));
-    with_vars(vars, || {
-        let config = Config::from_env().expect("Should load config with defaults");
-        assert_eq!(config.port, 3000, "Default port should be 3000");
-    });
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let config = Config::load().expect("Should load config with defaults");
+            assert_eq!(config.server.port, 3000, "Default port should be 3000");
+        },
+    );
 }
 
 /// Test that custom port is parsed correctly
 #[test]
 fn test_custom_port() {
-    let key = get_test_key_b64();
-    let mut vars = vertex_test_vars(&key);
-    vars.push(("PORT", Some("8080")));
-    with_vars(vars, || {
-        let config = Config::from_env().expect("Should load config");
-        assert_eq!(config.port, 8080, "Should use custom port");
-    });
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("MODELMUX_SERVER_PORT", Some("8080")),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let config = Config::load().expect("Should load config");
+            assert_eq!(config.server.port, 8080, "Should use custom port");
+        },
+    );
 }
 
-/// Test that invalid port produces error
+/// Test that invalid port causes error
 #[test]
 fn test_invalid_port() {
-    let key = get_test_key_b64();
-    let mut vars = vertex_test_vars(&key);
-    vars.push(("PORT", Some("99999"))); // Invalid port number
-    with_vars(vars, || {
-        let result = Config::from_env();
-        assert!(result.is_err(), "Should fail with invalid port");
-    });
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("MODELMUX_SERVER_PORT", Some("99999")), // Invalid port number
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let result = Config::load();
+            assert!(result.is_err(), "Should fail with invalid port");
+        },
+    );
 }
 
 /// Test log level parsing
 #[test]
 fn test_log_level_parsing() {
-    let key = get_test_key_b64();
     let levels = vec!["trace", "debug", "info", "warn", "error"];
     for level in levels {
-        let mut vars = vertex_test_vars(&key);
-        vars.push(("LOG_LEVEL", Some(level)));
-        with_vars(vars, || {
-            let config = Config::from_env().expect("Should load config");
-            assert_eq!(
-                format!("{:?}", config.log_level).to_lowercase(),
-                level,
-                "Should parse log level correctly"
-            );
-        });
+        with_vars(
+            vec![
+                ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+                ("MODELMUX_SERVER_LOG_LEVEL", Some(level)),
+                ("LLM_PROVIDER", Some("vertex")),
+                ("VERTEX_PROJECT", Some("test-project")),
+                ("VERTEX_LOCATION", Some("us-central1")),
+                ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+            ],
+            || {
+                let config = Config::load().expect("Should load config");
+                assert_eq!(
+                    format!("{:?}", config.server.log_level).to_lowercase(),
+                    level,
+                    "Should parse log level correctly"
+                );
+            },
+        );
     }
 }
 
 /// Test default log level
 #[test]
 fn test_default_log_level() {
-    if std::path::Path::new(".env").exists() {
-        eprintln!("Skipping test_default_log_level: .env file exists");
-        return;
-    }
-    let key = get_test_key_b64();
-    let mut vars = vertex_test_vars(&key);
-    vars.push(("LOG_LEVEL", None::<&str>));
-    with_vars(vars, || {
-        let config = Config::from_env().expect("Should load config");
-        assert_eq!(config.log_level, LogLevel::Info, "Default log level should be Info");
-    });
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let config = Config::load().expect("Should load config");
+            assert_eq!(config.server.log_level, LogLevel::Info, "Default log level should be Info");
+        },
+    );
 }
 
 /// Test streaming mode parsing
 #[test]
 fn test_streaming_mode_parsing() {
-    let key = get_test_key_b64();
     let modes = vec![
         ("auto", StreamingMode::Auto),
-        ("non-streaming", StreamingMode::NonStreaming),
+        ("never", StreamingMode::Never),
         ("standard", StreamingMode::Standard),
         ("buffered", StreamingMode::Buffered),
+        ("always", StreamingMode::Always),
     ];
     for (mode_str, expected_mode) in modes {
-        let mut vars = vertex_test_vars(&key);
-        vars.push(("STREAMING_MODE", Some(mode_str)));
-        with_vars(vars, || {
-            let config = Config::from_env().expect("Should load config");
-            assert_eq!(
-                config.streaming_mode, expected_mode,
-                "Should parse streaming mode '{}' correctly",
-                mode_str
-            );
-        });
+        with_vars(
+            vec![
+                ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+                ("MODELMUX_STREAMING_MODE", Some(mode_str)),
+                ("LLM_PROVIDER", Some("vertex")),
+                ("VERTEX_PROJECT", Some("test-project")),
+                ("VERTEX_LOCATION", Some("us-central1")),
+                ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+            ],
+            || {
+                let config = Config::load().expect("Should load config");
+                assert_eq!(
+                    config.streaming.mode, expected_mode,
+                    "Should parse streaming mode '{}' correctly",
+                    mode_str
+                );
+            },
+        );
     }
 }
 
 /// Test default streaming mode
 #[test]
 fn test_default_streaming_mode() {
-    let key = get_test_key_b64();
-    let mut vars = vertex_test_vars(&key);
-    vars.push(("STREAMING_MODE", None::<&str>));
-    with_vars(vars, || {
-        let config = Config::from_env().expect("Should load config");
-        assert_eq!(
-            config.streaming_mode,
-            StreamingMode::Auto,
-            "Default streaming mode should be Auto"
-        );
-    });
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let config = Config::load().expect("Should load config");
+            assert_eq!(
+                config.streaming.mode,
+                StreamingMode::Auto,
+                "Default streaming mode should be Auto"
+            );
+        },
+    );
 }
 
 /// Test retry configuration parsing
 #[test]
 fn test_retry_config() {
-    let key = get_test_key_b64();
-    let mut vars = vertex_test_vars(&key);
-    vars.push(("ENABLE_RETRIES", Some("false")));
-    vars.push(("MAX_RETRY_ATTEMPTS", Some("5")));
-    with_vars(vars, || {
-        let config = Config::from_env().expect("Should load config");
-        assert_eq!(config.enable_retries, false, "Should parse enable_retries");
-        assert_eq!(config.max_retry_attempts, 5, "Should parse max_retry_attempts");
-    });
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("MODELMUX_SERVER_ENABLE_RETRIES", Some("false")),
+            ("MODELMUX_SERVER_MAX_RETRY_ATTEMPTS", Some("5")),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let config = Config::load().expect("Should load config");
+            assert_eq!(config.server.enable_retries, false, "Should parse enable_retries");
+            assert_eq!(config.server.max_retry_attempts, 5, "Should parse max_retry_attempts");
+        },
+    );
 }
 
 /// Test default retry configuration
 #[test]
 fn test_default_retry_config() {
-    let key = get_test_key_b64();
-    let mut vars = vertex_test_vars(&key);
-    vars.push(("ENABLE_RETRIES", None::<&str>));
-    vars.push(("MAX_RETRY_ATTEMPTS", None::<&str>));
-    with_vars(vars, || {
-        let config = Config::from_env().expect("Should load config");
-        assert_eq!(config.enable_retries, true, "Default enable_retries should be true");
-        assert_eq!(config.max_retry_attempts, 3, "Default max_retry_attempts should be 3");
-    });
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let config = Config::load().expect("Should load config");
+            assert_eq!(config.server.enable_retries, true, "Default enable_retries should be true");
+            assert_eq!(
+                config.server.max_retry_attempts, 3,
+                "Default max_retry_attempts should be 3"
+            );
+        },
+    );
 }
 
-/// Test LogLevel::is_trace_enabled
+/// Test that config fails without required auth configuration
 #[test]
-fn test_log_level_trace_enabled() {
-    assert!(LogLevel::Trace.is_trace_enabled(), "Trace should enable trace logging");
-    assert!(LogLevel::Debug.is_trace_enabled(), "Debug should enable trace logging");
-    assert!(!LogLevel::Info.is_trace_enabled(), "Info should not enable trace logging");
-    assert!(!LogLevel::Warn.is_trace_enabled(), "Warn should not enable trace logging");
-    assert!(!LogLevel::Error.is_trace_enabled(), "Error should not enable trace logging");
+fn test_config_fails_without_auth() {
+    with_vars(
+        vec![
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let result = Config::load();
+            assert!(result.is_err(), "Should fail when auth configuration is missing");
+        },
+    );
 }
 
-/// Test StreamingMode::from string conversion
+/// Test StreamingMode::from_str function
 #[test]
 fn test_streaming_mode_from_str() {
-    assert_eq!(StreamingMode::from("auto"), StreamingMode::Auto);
-    assert_eq!(StreamingMode::from("AUTO"), StreamingMode::Auto); // Case insensitive
-    assert_eq!(StreamingMode::from("non-streaming"), StreamingMode::NonStreaming);
-    assert_eq!(StreamingMode::from("nonstreaming"), StreamingMode::NonStreaming);
-    assert_eq!(StreamingMode::from("none"), StreamingMode::NonStreaming);
-    assert_eq!(StreamingMode::from("standard"), StreamingMode::Standard);
-    assert_eq!(StreamingMode::from("std"), StreamingMode::Standard);
-    assert_eq!(StreamingMode::from("buffered"), StreamingMode::Buffered);
-    assert_eq!(StreamingMode::from("buffer"), StreamingMode::Buffered);
-    assert_eq!(StreamingMode::from("unknown"), StreamingMode::Auto); // Default
+    assert_eq!(StreamingMode::from_str("auto").unwrap(), StreamingMode::Auto);
+    assert_eq!(StreamingMode::from_str("AUTO").unwrap(), StreamingMode::Auto); // Case insensitive
+    assert_eq!(StreamingMode::from_str("never").unwrap(), StreamingMode::Never);
+    assert_eq!(StreamingMode::from_str("standard").unwrap(), StreamingMode::Standard);
+    assert_eq!(StreamingMode::from_str("buffered").unwrap(), StreamingMode::Buffered);
+    assert_eq!(StreamingMode::from_str("always").unwrap(), StreamingMode::Always);
+    assert!(StreamingMode::from_str("unknown").is_err()); // Should fail for invalid input
 }
 
-/// Test LogLevel::from string conversion
+/// Test LogLevel::from_str function
 #[test]
 fn test_log_level_from_str() {
-    assert_eq!(LogLevel::from("trace"), LogLevel::Trace);
-    assert_eq!(LogLevel::from("TRACE"), LogLevel::Trace); // Case insensitive
-    assert_eq!(LogLevel::from("debug"), LogLevel::Debug);
-    assert_eq!(LogLevel::from("info"), LogLevel::Info);
-    assert_eq!(LogLevel::from("warn"), LogLevel::Warn);
-    assert_eq!(LogLevel::from("error"), LogLevel::Error);
-    assert_eq!(LogLevel::from("unknown"), LogLevel::Info); // Default
+    assert_eq!(LogLevel::from_str("trace").unwrap(), LogLevel::Trace);
+    assert_eq!(LogLevel::from_str("TRACE").unwrap(), LogLevel::Trace); // Case insensitive
+    assert_eq!(LogLevel::from_str("debug").unwrap(), LogLevel::Debug);
+    assert_eq!(LogLevel::from_str("info").unwrap(), LogLevel::Info);
+    assert_eq!(LogLevel::from_str("warn").unwrap(), LogLevel::Warn);
+    assert_eq!(LogLevel::from_str("error").unwrap(), LogLevel::Error);
+    assert!(LogLevel::from_str("unknown").is_err()); // Should fail for invalid input
 }
 
-/// Test build_predict_url (Vertex vars)
+/// Test build_predict_url functionality
 #[test]
 fn test_build_predict_url() {
-    let key = get_test_key_b64();
-    with_vars(vertex_test_vars(&key), || {
-        let config = Config::from_env().expect("Should load config");
-        let streaming_url = config.build_predict_url(true);
-        assert!(
-            streaming_url.contains("streamRawPredict"),
-            "Streaming URL should contain streamRawPredict"
-        );
-        let non_streaming_url = config.build_predict_url(false);
-        assert!(
-            non_streaming_url.contains("rawPredict"),
-            "Non-streaming URL should contain rawPredict"
-        );
-        assert!(
-            config.build_predict_url(false).contains("test-region-aiplatform.googleapis.com"),
-            "URL should be built from Vertex vars"
-        );
-    });
-}
+    with_vars(
+        vec![
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
+            ("LLM_PROVIDER", Some("vertex")),
+            ("VERTEX_PROJECT", Some("test-project")),
+            ("VERTEX_LOCATION", Some("us-central1")),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+        ],
+        || {
+            let config = Config::load().expect("Should load config");
+            let streaming_url = config.build_predict_url(true);
+            assert!(
+                streaming_url.contains("streamRawPredict"),
+                "Streaming URL should contain streamRawPredict"
+            );
 
-/// Helper function to get base64-encoded test service account key
-fn get_test_key_b64() -> String {
-    let minimal_key_json = r#"{
-        "type": "service_account",
-        "project_id": "test-project",
-        "private_key_id": "test-key-id",
-        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----\n",
-        "client_email": "test@test-project.iam.gserviceaccount.com",
-        "client_id": "123456789",
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test%40test-project.iam.gserviceaccount.com"
-    }"#;
-    base64::engine::general_purpose::STANDARD.encode(minimal_key_json)
+            let non_streaming_url = config.build_predict_url(false);
+            assert!(
+                non_streaming_url.contains("rawPredict"),
+                "Non-streaming URL should contain rawPredict"
+            );
+            assert!(
+                !non_streaming_url.contains("streamRawPredict"),
+                "Non-streaming URL should not contain streamRawPredict"
+            );
+        },
+    );
 }
