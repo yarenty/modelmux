@@ -28,7 +28,7 @@ fn get_binary_command() -> Command {
 fn test_version_flag() {
     let mut cmd = get_binary_command();
     cmd.arg("--version");
-    
+
     let output = cmd.output().expect("Failed to execute command");
 
     assert!(output.status.success(), "Version command should succeed");
@@ -51,7 +51,7 @@ fn test_version_flag() {
 fn test_version_flag_short() {
     let mut cmd = get_binary_command();
     cmd.arg("-V");
-    
+
     let output = cmd.output().expect("Failed to execute command");
 
     assert!(output.status.success(), "Version command should succeed");
@@ -68,21 +68,13 @@ fn test_version_flag_short() {
 fn test_help_flag() {
     let mut cmd = get_binary_command();
     cmd.arg("--help");
-    
+
     let output = cmd.output().expect("Failed to execute command");
 
     assert!(output.status.success(), "Help command should succeed");
     let stdout = str::from_utf8(&output.stdout).expect("Invalid UTF-8");
-    assert!(
-        stdout.contains("USAGE"),
-        "Help output should contain 'USAGE', got: {}",
-        stdout
-    );
-    assert!(
-        stdout.contains("OPTIONS"),
-        "Help output should contain 'OPTIONS', got: {}",
-        stdout
-    );
+    assert!(stdout.contains("USAGE"), "Help output should contain 'USAGE', got: {}", stdout);
+    assert!(stdout.contains("OPTIONS"), "Help output should contain 'OPTIONS', got: {}", stdout);
     assert!(
         stdout.contains("ENVIRONMENT VARIABLES"),
         "Help output should contain 'ENVIRONMENT VARIABLES', got: {}",
@@ -95,16 +87,12 @@ fn test_help_flag() {
 fn test_help_flag_short() {
     let mut cmd = get_binary_command();
     cmd.arg("-h");
-    
+
     let output = cmd.output().expect("Failed to execute command");
 
     assert!(output.status.success(), "Help command should succeed");
     let stdout = str::from_utf8(&output.stdout).expect("Invalid UTF-8");
-    assert!(
-        stdout.contains("USAGE"),
-        "Help output should contain 'USAGE', got: {}",
-        stdout
-    );
+    assert!(stdout.contains("USAGE"), "Help output should contain 'USAGE', got: {}", stdout);
 }
 
 /// Test that doctor command works
@@ -112,7 +100,7 @@ fn test_help_flag_short() {
 fn test_doctor_command() {
     let mut cmd = get_binary_command();
     cmd.arg("doctor");
-    
+
     // Set a timeout to avoid hanging
     let output = cmd.output().expect("Failed to execute command");
 
@@ -121,7 +109,7 @@ fn test_doctor_command() {
     let stdout = str::from_utf8(&output.stdout).unwrap_or("");
     let stderr = str::from_utf8(&output.stderr).unwrap_or("");
     let combined = format!("{}\n{}", stdout, stderr);
-    
+
     // Doctor command should produce some output (diagnostics)
     // It may contain various keywords depending on config state
     // Check for text indicators that doctor ran, or config/port errors
@@ -145,11 +133,11 @@ fn test_doctor_command() {
         || combined.contains("[INFO]")
         || combined.contains("[TIP]")
         || combined.contains("[SUCCESS]");
-    
+
     // If we got any output at all, that's a good sign
     // The command should at least print something
     let has_any_output = !stdout.is_empty() || !stderr.is_empty();
-    
+
     assert!(
         has_diagnostic_keywords || (has_any_output && output.status.code() == Some(0)),
         "Doctor command should produce diagnostic output or exit successfully. stdout: '{}', stderr: '{}', exit_code: {:?}, combined: '{}'",
@@ -184,7 +172,6 @@ fn test_validate_command() {
     assert!(
         has_result,
         "Validate output should contain validation result, got stdout: {}, stderr: {}",
-        stdout,
-        stderr
+        stdout, stderr
     );
 }
