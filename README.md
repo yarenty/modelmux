@@ -32,6 +32,19 @@ ModelMux is a production-ready, async Rust proxy that acts as a drop-in replacem
 It translates OpenAI-compatible requests into Google Vertex AI (Anthropic Claude) calls while preserving streaming, tool/function calling, and error semantics.
 Designed for performance, safety, and clean architecture, ModelMux is ideal for teams standardizing on OpenAI APIs while running on Vertex AI infrastructure.
 
+## 🎉 New in v0.6.0: Professional Configuration System
+
+ModelMux now features a professional, industry-standard configuration system:
+
+- **🏗️ Multi-layered configuration**: CLI args > env vars > user config > system config > defaults
+- **📁 Platform-native directories**: XDG-compliant paths on Linux, standard locations on macOS/Windows
+- **📝 TOML configuration**: Human-readable config files instead of complex environment variables
+- **🔒 Secure credential storage**: File-based service account storage with proper permissions
+- **⚙️ CLI management**: `modelmux config init`, `validate`, `show`, and `edit` commands
+- **🔄 Backward compatible**: Existing `.env` configurations continue to work
+
+**Quick setup**: `modelmux config init` creates your configuration interactively!
+
 
 <p align="center">
 <a href="#installation">Installation</a> •
@@ -78,6 +91,7 @@ ModelMux is a **high-performance Rust proxy server** that seamlessly converts Op
 - **🔄 Retry Logic**: Configurable retry mechanisms with exponential backoff
 - **📊 Observability**: Structured logging and health monitoring
 - **🧩 Clean Architecture**: SOLID principles with modular design
+- **⚙️ Professional Config**: Multi-layered configuration with CLI management tools
 
 ---
 
@@ -111,7 +125,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-modelmux = "0.2"
+modelmux = "0.6"
 ```
 
 ---
@@ -120,28 +134,36 @@ modelmux = "0.2"
 
 <!-- "The trouble with having an open mind, of course, is that people keep coming along and sticking things into it." - Terry Pratchett -->
 
-### 1. Set up your environment
+### 1. Set up configuration
 
-Create a `.env` file:
+Use the interactive configuration wizard:
 
-```env
-# Either set full URL (overrides provider-specific fields):
-# LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/MY_PROJECT/locations/europe-west1/publishers/anthropic/models/claude-sonnet-4@20250514"
-
-# Or set Vertex-specific fields (LLM_PROVIDER=vertex):
-LLM_PROVIDER=vertex
-GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
-VERTEX_REGION=europe-west1
-VERTEX_PROJECT=my-gcp-project
-VERTEX_LOCATION=europe-west1
-VERTEX_PUBLISHER=anthropic
-VERTEX_MODEL_ID=claude-sonnet-4@20250514
-
-# Optional: Server and streaming
-PORT=3000
-LOG_LEVEL=info
-STREAMING_MODE=auto
+```bash
+modelmux config init
 ```
+
+Or create a configuration file manually at `~/.config/modelmux/config.toml`:
+
+```toml
+[server]
+port = 3000
+log_level = "info"
+enable_retries = true
+max_retry_attempts = 3
+
+[auth]
+# Path to Google Cloud service account JSON file
+service_account_file = "~/.config/modelmux/service-account.json"
+# Or inline JSON for containers:
+# service_account_json = '{"type": "service_account", ...}'
+
+[streaming]
+mode = "auto"  # auto, never, standard, buffered, always
+buffer_size = 65536
+chunk_timeout_ms = 5000
+```
+
+**Note**: Provider configuration (LLM_PROVIDER, VERTEX_* variables) is still handled via environment variables for backward compatibility.
 
 ### 2. Run ModelMux
 
@@ -151,7 +173,17 @@ modelmux
 cargo run --release
 ```
 
-### 3. Send OpenAI-compatible requests
+### 3. Validate and start
+
+```bash
+# Validate your configuration
+modelmux config validate
+
+# Start the server
+modelmux
+```
+
+### 4. Send OpenAI-compatible requests
 
 ```bash
 curl -X POST http://localhost:3000/v1/chat/completions \
@@ -169,23 +201,69 @@ That's it! Your OpenAI code now talks to Vertex AI.
 
 ## Configuration
 
-### Environment Variables
+ModelMux uses a modern, professional configuration system with multiple sources:
+
+### Configuration File (Recommended)
+
+Create `~/.config/modelmux/config.toml`:
+
+```toml
+# ModelMux Configuration
+# Platform-specific locations:
+#   Linux: ~/.config/modelmux/config.toml
+#   macOS: ~/Library/Application Support/modelmux/config.toml  
+#   Windows: %APPDATA%/modelmux/config.toml
+
+[server]
+port = 3000
+log_level = "info"        # trace, debug, info, warn, error
+enable_retries = true
+max_retry_attempts = 3
+
+[auth]
+# Recommended: Use service account file
+service_account_file = "~/.config/modelmux/service-account.json"
+
+# Alternative: Inline JSON (for containers)
+# service_account_json = '{"type": "service_account", ...}'
+
+[streaming]
+mode = "auto"             # auto, never, standard, buffered, always
+buffer_size = 65536
+chunk_timeout_ms = 5000
+```
+
+### CLI Configuration Commands
 
 ```bash
-# Either LLM_URL (full resource URL) or Vertex-specific:
-# export LLM_URL="https://europe-west1-aiplatform.googleapis.com/v1/projects/.../models/claude-sonnet-4@20250514"
+# Interactive setup wizard
+modelmux config init
+
+# Display current configuration  
+modelmux config show
+
+# Validate configuration
+modelmux config validate
+
+# Edit configuration file
+modelmux config edit
+```
+
+### Environment Variables (Legacy)
+
+Still supported for backward compatibility:
+
+```bash
+# Provider configuration (still required)
 export LLM_PROVIDER=vertex
-export GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
-export VERTEX_REGION=europe-west1
 export VERTEX_PROJECT=my-gcp-project
 export VERTEX_LOCATION=europe-west1
-export VERTEX_PUBLISHER=anthropic
-export VERTEX_MODEL_ID=claude-sonnet-4@20250514
+export VERTEX_MODEL_ID=claude-3-5-sonnet@20241022
 
-# Optional
-export PORT=3000
-export LOG_LEVEL=info
-export STREAMING_MODE=auto
+# Configuration overrides (use MODELMUX_ prefix)
+export MODELMUX_SERVER_PORT=3000
+export MODELMUX_SERVER_LOG_LEVEL=info
+export MODELMUX_AUTH_SERVICE_ACCOUNT_FILE=/path/to/key.json
 ```
 
 <!-- "Time flies like an arrow; fruit flies like a banana." - Groucho Marx -->
@@ -458,10 +536,16 @@ cargo run
 
 *See [ROADMAP.md](ROADMAP.md) for detailed future plans.*
 
+**✅ Completed in v0.6.0:**
+- ✅ Professional configuration system with TOML files
+- ✅ Configuration validation tools (`modelmux config validate`)
+- ✅ CLI configuration management (`modelmux config init/show/edit`)
+- ✅ Platform-native configuration directories
+- ✅ Secure service account file handling
+
 **Near term:**
 - Docker container images
-- Configuration validation tools
-- Enhanced metrics and monitoring
+- Enhanced metrics and monitoring (Prometheus, OpenTelemetry)
 
 **Future:**
 - Multiple provider support (OpenAI, Anthropic, Cohere, etc.)

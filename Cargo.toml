@@ -1,6 +1,6 @@
 [package]
 name = "modelmux"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 authors = ["Jaro <yarenty@gmail.com>"]
 description = "ModelMux - high-performance Rust gateway that translates OpenAI-compatible API requests to Vertex AI (Claude), with streaming, tool calling, and production-grade reliability."

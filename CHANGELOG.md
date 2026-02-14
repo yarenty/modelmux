@@ -5,6 +5,91 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-02-14
+
+### Added
+
+#### Configuration System
+- **Multi-layered configuration hierarchy**: CLI args > env vars > user config > system config > defaults
+- **Platform-native directories**: Uses XDG Base Directory Specification on Linux, standard directories on macOS/Windows
+  - Linux/Unix: `~/.config/modelmux/config.toml`
+  - macOS: `~/Library/Application Support/modelmux/config.toml`
+  - Windows: `%APPDATA%/modelmux/config.toml`
+- **TOML configuration format**: Human-readable, industry-standard configuration files
+- **Secure service account handling**: File-based storage with proper permissions (chmod 600)
+- **Path expansion**: Support for tilde (`~`) and environment variable expansion
+
+#### CLI Configuration Management
+- **`modelmux config init`**: Interactive configuration setup wizard
+- **`modelmux config show`**: Display current configuration from all sources
+- **`modelmux config validate`**: Comprehensive configuration validation
+- **`modelmux config edit`**: Open configuration file in default editor
+
+#### New Dependencies
+- **`directories = "5.0"`**: Cross-platform directory resolution
+- **`toml = "0.8"`**: TOML parsing and serialization
+- **`shellexpand = "3.1"`**: Path expansion with environment variables
+
+### Changed
+
+#### Configuration Structure
+- **Structured configuration**: Replaced flat environment variables with organized TOML sections:
+  ```toml
+  [server]
+  port = 3000
+  log_level = "info"
+  
+  [auth]
+  service_account_file = "~/.config/modelmux/service-account.json"
+  
+  [streaming]
+  mode = "auto"
+  ```
+- **Modular architecture**: Clean separation of concerns across config modules:
+  - `config/mod.rs`: Main config types and public API
+  - `config/loader.rs`: Multi-layered configuration loading
+  - `config/paths.rs`: Platform-native path resolution
+  - `config/validation.rs`: Comprehensive validation
+  - `config/cli.rs`: Interactive CLI commands
+
+#### Security Improvements
+- **File-based credentials**: Service accounts stored as JSON files instead of base64 environment variables
+- **Permission validation**: Automatic checking of file permissions for security
+- **Secure defaults**: Proper file permissions set by default
+
+#### Backward Compatibility
+- **Legacy environment variables**: Still supported with deprecation warnings
+- **Graceful migration**: Existing `.env` usage continues to work
+- **Progressive adoption**: Users can migrate at their own pace
+
+### Deprecated
+
+- **`.env` file configuration**: Use TOML configuration files instead
+- **GCP_SERVICE_ACCOUNT_KEY environment variable**: Use `service_account_file` or `service_account_json` in config
+- **Flat environment variables**: Use structured TOML configuration
+
+### Technical Improvements
+
+#### Architecture
+- **SOLID principles**: Enhanced modular design with clear separation of concerns
+- **Builder pattern**: Flexible configuration loading with method chaining
+- **Type safety**: Full compile-time validation of configuration structure
+- **Error handling**: Comprehensive error messages with actionable suggestions
+
+#### Testing
+- **31 passing tests**: Comprehensive unit and integration test coverage
+- **Cross-platform testing**: Configuration loading, path resolution, file handling
+- **CLI testing**: Interactive commands and validation scenarios
+- **Security testing**: File permission and credential validation
+
+#### Developer Experience
+- **Professional CLI**: Industry-standard configuration management interface
+- **Clear documentation**: Module-level documentation with examples
+- **Helpful errors**: Detailed error messages with fix suggestions
+- **Example configurations**: Well-commented TOML examples
+
+---
+
 ## [0.5.0] - 2026-02-10
 
 ### Added
