@@ -22,8 +22,8 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Load configuration from environment
-//!     let config = Config::from_env()?;
+//!     // Load configuration from all sources (files, env vars, defaults)
+//!     let config = Config::load()?;
 //!
 //!     // Create the application
 //!     let app = create_app(config).await?;
@@ -38,23 +38,52 @@
 //!
 //! ## Configuration
 //!
-//! Configure the server using environment variables:
+//! ModelMux uses a professional configuration system with multiple sources:
 //!
+//! 1. **Configuration File** (recommended):
+//! ```toml
+//! # ~/.config/modelmux/config.toml (Linux)
+//! # ~/Library/Application Support/modelmux/config.toml (macOS)
+//! # %APPDATA%/modelmux/config.toml (Windows)
+//!
+//! [server]
+//! port = 3000
+//! log_level = "info"
+//!
+//! [llm_provider]
+//! provider = "vertex"
+//! project_id = "my-gcp-project"
+//! location = "us-central1"
+//! model_id = "claude-3-5-sonnet@20241022"
+//!
+//! [auth]
+//! service_account_file = "~/.config/modelmux/service-account.json"
+//!
+//! [streaming]
+//! mode = "auto"
+//! ```
+//!
+//! 2. **Environment Variables**:
 //! ```bash
-//! # Required: Base64-encoded Google Cloud service account key
-//! export GCP_SERVICE_ACCOUNT_KEY="your-base64-encoded-key-here"
+//! export MODELMUX_SERVER_PORT=3000
+//! export MODELMUX_SERVER_LOG_LEVEL=info
+//! export MODELMUX_LLM_PROVIDER_PROJECT_ID=my-gcp-project
+//! export MODELMUX_AUTH_SERVICE_ACCOUNT_FILE=/path/to/service-account.json
+//! ```
 //!
-//! # Provider: use LLM_URL (full resource URL) or provider-specific fields (e.g. Vertex: GCP_SERVICE_ACCOUNT_KEY, VERTEX_*)
-//! export LLM_PROVIDER=vertex
-//! export VERTEX_REGION=europe-west1
-//! export VERTEX_PROJECT=my-project
-//! export VERTEX_LOCATION=europe-west1
-//! export VERTEX_PUBLISHER=anthropic
-//! export VERTEX_MODEL_ID=claude-sonnet-4@20250514
+//! 3. **CLI Setup**:
+//! ```bash
+//! # Interactive configuration setup
+//! modelmux config init
 //!
-//! export PORT=3000
-//! export LOG_LEVEL=info
-//! export STREAMING_MODE=auto
+//! # Validate configuration
+//! modelmux config validate
+//!
+//! # Show current configuration
+//! modelmux config show
+//!
+//! # Edit configuration
+//! modelmux config edit
 //! ```
 //!
 //! ## API Usage
@@ -89,11 +118,11 @@ use axum::Router;
 use axum::routing::{get, post};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
-use tracing::{Level, info};
-use dotenvy;
+use tracing::info;
 
-use crate::config::Config;
+use crate::config::{Config, cli::ConfigCli};
 use crate::error::Result;
+use crate::provider::LlmProviderBackend;
 use crate::server::AppState;
 
 /* --- modules --------------------------------------------------------------------------------- */
@@ -125,7 +154,9 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[tokio::main]
 async fn main() {
     // Handle CLI arguments before config loading
-    handle_cli_args();
+    if let Some(exit_code) = handle_cli_args().await {
+        std::process::exit(exit_code);
+    }
 
     if let Err(e) = run().await {
         // Print error message line by line to ensure proper formatting
@@ -152,29 +183,31 @@ async fn run() -> Result<()> {
 /// Handle command line arguments like --version and --help before config loading.
 ///
 /// This ensures these commands work even without proper configuration.
-fn handle_cli_args() {
+/// Returns Some(exit_code) if the program should exit, None to continue.
+async fn handle_cli_args() -> Option<i32> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        return; // No arguments, proceed with normal startup
+        return None; // No arguments, proceed with normal startup
     }
 
     match args[1].as_str() {
         "--version" | "-V" => {
             println!("modelmux {}", VERSION);
-            std::process::exit(0);
+            Some(0)
         }
         "--help" | "-h" => {
             print_help();
-            std::process::exit(0);
+            Some(0)
         }
+        "config" => handle_config_command(&args[2..]).await,
         "doctor" => {
-            run_doctor();
-            std::process::exit(0);
+            let exit_code = run_doctor();
+            Some(exit_code)
         }
         "validate" => {
             let exit_code = run_validate();
-            std::process::exit(exit_code);
+            Some(exit_code)
         }
         _ => {
             // Unknown command or option - show error and help
@@ -182,11 +215,12 @@ fn handle_cli_args() {
                 eprintln!("Error: Unknown option: {}", args[1]);
                 eprintln!();
                 print_help();
-                std::process::exit(1);
+                Some(1)
             } else {
                 eprintln!("Error: Unknown command: {}", args[1]);
                 eprintln!();
                 eprintln!("Available commands:");
+                eprintln!("  config    - Configuration management");
                 eprintln!("  doctor    - Run configuration health check");
                 eprintln!("  validate  - Validate configuration");
                 eprintln!();
@@ -195,10 +229,68 @@ fn handle_cli_args() {
                 eprintln!("  --help, -h     - Show help");
                 eprintln!();
                 eprintln!("Run 'modelmux --help' for more information.");
-                std::process::exit(1);
+                Some(1)
             }
         }
     }
+}
+
+///
+/// Handle config subcommands.
+async fn handle_config_command(args: &[String]) -> Option<i32> {
+    if args.is_empty() {
+        eprintln!("Error: Missing config subcommand");
+        eprintln!();
+        print_config_help();
+        return Some(1);
+    }
+
+    let result = match args[0].as_str() {
+        "init" => ConfigCli::init(),
+        "show" => ConfigCli::show(),
+        "validate" => ConfigCli::validate(),
+        "edit" => ConfigCli::edit(),
+        "--help" | "-h" => {
+            print_config_help();
+            return Some(0);
+        }
+        _ => {
+            eprintln!("Error: Unknown config subcommand: {}", args[0]);
+            eprintln!();
+            print_config_help();
+            return Some(1);
+        }
+    };
+
+    match result {
+        Ok(_) => Some(0),
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            Some(1)
+        }
+    }
+}
+
+///
+/// Print config command help.
+fn print_config_help() {
+    println!("ModelMux Configuration Management");
+    println!();
+    println!("USAGE:");
+    println!("    modelmux config <SUBCOMMAND>");
+    println!();
+    println!("SUBCOMMANDS:");
+    println!("    init        Interactive configuration setup");
+    println!("    show        Display current configuration");
+    println!("    validate    Validate configuration");
+    println!("    edit        Edit configuration file in default editor");
+    println!("    help        Show this help message");
+    println!();
+    println!("EXAMPLES:");
+    println!("    modelmux config init        # Set up configuration interactively");
+    println!("    modelmux config show        # Show current configuration");
+    println!("    modelmux config validate    # Check configuration validity");
+    println!("    modelmux config edit        # Open config file in editor");
 }
 
 ///
@@ -211,12 +303,22 @@ fn print_help() {
     println!("    modelmux [COMMAND] [OPTIONS]");
     println!();
     println!("COMMANDS:");
-    println!("    doctor              Check configuration and system health");
-    println!("    validate            Validate configuration and exit");
+    println!("    config              Configuration management (init, show, validate, edit)");
+    println!("    doctor              Check configuration and system health (legacy)");
+    println!("    validate            Validate configuration and exit (legacy)");
     println!();
     println!("OPTIONS:");
     println!("    -h, --help          Print help information");
     println!("    -V, --version       Print version information");
+    println!();
+    println!("CONFIGURATION:");
+    println!("    ModelMux uses a modern configuration system with multiple sources:");
+    println!("    1. Configuration files (TOML format in standard directories)");
+    println!("    2. Environment variables (MODELMUX_* prefix)");
+    println!("    3. Built-in defaults");
+    println!();
+    println!("    Run 'modelmux config init' to set up configuration interactively.");
+    println!("    Run 'modelmux config --help' for configuration management help.");
     println!();
     println!("ENVIRONMENT VARIABLES:");
     println!("    PORT                       Server port (default: 3000)");
@@ -228,13 +330,19 @@ fn print_help() {
     );
     println!();
     println!("  Provider / model configuration:");
-    println!("    LLM_PROVIDER               Backend: vertex (default) or openai_compatible (future)");
+    println!(
+        "    LLM_PROVIDER               Backend: vertex (default) or openai_compatible (future)"
+    );
     println!();
     println!("    Either set a single override (ignores provider-specific fields):");
-    println!("    LLM_URL                    Full resource URL (no :rawPredict/:streamRawPredict suffix)");
+    println!(
+        "    LLM_URL                    Full resource URL (no :rawPredict/:streamRawPredict suffix)"
+    );
     println!();
     println!("    Or set provider-specific fields. For Vertex (LLM_PROVIDER=vertex):");
-    println!("    GCP_SERVICE_ACCOUNT_KEY    Base64-encoded Google Cloud service account key (required)");
+    println!(
+        "    GCP_SERVICE_ACCOUNT_KEY    Base64-encoded Google Cloud service account key (required)"
+    );
     println!("    VERTEX_REGION              e.g. europe-west1");
     println!("    VERTEX_PROJECT             GCP project ID");
     println!("    VERTEX_LOCATION            e.g. europe-west1");
@@ -250,100 +358,110 @@ fn print_help() {
 }
 
 ///
-/// Run the doctor command to check configuration and system health.
+/// Run diagnostic check of the server configuration and environment (legacy command).
 ///
-/// Performs comprehensive checks and provides helpful diagnostics.
-fn run_doctor() {
-    // Load .env file first so we can check actual environment variables.
-    // dotenvy walks up from current directory; returns Ok(path) if found, Err if not.
-    let env_loaded = match dotenvy::dotenv() {
-        Ok(path) => {
-            println!("ModelMux Doctor - Configuration Health Check");
-            println!("{}", "=".repeat(60));
-            println!();
-            println!("[OK] Loaded .env from {}", path.display());
-            println!();
-            true
-        }
-        Err(_) => {
-            println!("ModelMux Doctor - Configuration Health Check");
-            println!("{}", "=".repeat(60));
-            println!();
-            println!("[INFO] No .env file found in current directory or parents");
-            println!("       (using environment variables only)");
-            println!();
-            false
-        }
-    };
+/// This command helps users verify their configuration is correct by loading
+/// and validating all settings, then providing detailed feedback about any
+/// issues found.
+fn run_doctor() -> i32 {
+    println!("⚠️  The 'doctor' command is deprecated. Use 'modelmux config validate' instead.");
+    println!();
+    println!("ModelMux Doctor - Configuration Health Check");
+    println!("==========================================");
+    println!();
 
-    // Try to load and validate config
-    println!("Configuration Validation:");
-    match Config::from_env() {
+    // Check if configuration files exist
+    let config_paths = crate::config::paths::config_file_paths();
+    let mut found_config = false;
+
+    println!("Configuration file locations:");
+    for (i, path) in config_paths.iter().enumerate() {
+        let priority = match i {
+            0 => "user config",
+            _ => "system config",
+        };
+
+        if path.exists() {
+            println!("  ✓ {} found: {}", priority, path.display());
+            found_config = true;
+        } else {
+            println!("  ✗ {} not found: {}", priority, path.display());
+        }
+    }
+
+    if !found_config {
+        println!("  ℹ️  No configuration files found, using defaults and environment variables");
+    }
+    println!();
+
+    // Try to load configuration
+    println!("Testing configuration loading:");
+    match Config::load() {
         Ok(config) => {
-            println!("  [OK] Configuration loaded successfully");
+            println!("✓ Configuration loaded successfully");
             println!();
 
-            let issues = config.validate();
-            if issues.is_empty() {
-                println!("  [OK] No validation issues found");
-                println!();
-                println!("[SUCCESS] Configuration looks good! You're ready to run ModelMux.");
-            } else {
-                let errors: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Error).collect();
-                let warnings: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Warning).collect();
-                let infos: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Info).collect();
-
-                if !errors.is_empty() {
-                    println!("  [ERROR] Found {} error(s):", errors.len());
-                    for issue in &errors {
-                        println!("     • {}: {}", issue.field, issue.message);
-                        if let Some(suggestion) = &issue.suggestion {
-                            println!("       [TIP] {}", suggestion);
-                        }
-                    }
+            // Run validation checks
+            println!("Running validation checks:");
+            match config.validate() {
+                Ok(_) => {
+                    println!("✓ No validation issues found");
                     println!();
-                }
-
-                if !warnings.is_empty() {
-                    println!("  [WARNING] Found {} warning(s):", warnings.len());
-                    for issue in &warnings {
-                        println!("     • {}: {}", issue.field, issue.message);
-                        if let Some(suggestion) = &issue.suggestion {
-                            println!("       [TIP] {}", suggestion);
-                        }
-                    }
+                    println!("[SUCCESS] Configuration looks good! You're ready to run ModelMux.");
                     println!();
-                }
-
-                if !infos.is_empty() {
-                    println!("  [INFO] Found {} info message(s):", infos.len());
-                    for issue in &infos {
-                        println!("     • {}: {}", issue.field, issue.message);
-                        if let Some(suggestion) = &issue.suggestion {
-                            println!("       [TIP] {}", suggestion);
-                        }
+                    println!("Configuration summary:");
+                    println!("  Server port: {}", config.server.port);
+                    println!("  Log level: {:?}", config.server.log_level);
+                    if let Some(ref provider) = config.llm_provider {
+                        println!("  LLM provider: {}", provider.id());
+                    } else {
+                        println!("  LLM provider: Not loaded");
                     }
-                    println!();
-                }
+                    println!("  Streaming mode: {:?}", config.streaming.mode);
 
-                if errors.is_empty() {
-                    println!("[SUCCESS] Configuration has warnings but should work. Review suggestions above.");
-                } else {
-                    println!("[ERROR] Configuration has errors. Please fix them before running ModelMux.");
+                    if let Some(ref file) = config.auth.service_account_file {
+                        match crate::config::paths::expand_path(file) {
+                            Ok(path) => {
+                                if path.exists() {
+                                    println!("  Service account file: ✓ {}", path.display());
+                                } else {
+                                    println!(
+                                        "  Service account file: ✗ {} (not found)",
+                                        path.display()
+                                    );
+                                }
+                            }
+                            Err(_) => {
+                                println!("  Service account file: ✗ {} (invalid path)", file);
+                            }
+                        }
+                    } else if config.auth.service_account_json.is_some() {
+                        println!("  Service account: ✓ Inline JSON configured");
+                    } else {
+                        println!("  Service account: ✗ Not configured");
+                    }
+
+                    0
+                }
+                Err(e) => {
+                    println!("✗ Configuration validation failed:");
+                    println!("{}", e);
+                    println!();
+                    println!(
+                        "[ERROR] Configuration has errors. Please fix them before running ModelMux."
+                    );
+                    1
                 }
             }
         }
         Err(e) => {
-            println!("  [ERROR] Failed to load configuration:");
-            println!("     {}", e);
+            println!("✗ Configuration loading failed: {}", e);
             println!();
             println!("Suggestions:");
-            if !env_loaded {
-                println!("   • Run 'modelmux doctor' from your project directory (where .env is located)");
-            }
-            println!("   • Use either LLM_URL (full resource URL) or Vertex-specific fields (GCP_SERVICE_ACCOUNT_KEY, VERTEX_*)");
-            println!("   • Ensure GCP_SERVICE_ACCOUNT_KEY is set (base64-encoded JSON key)");
-            println!("   • Run 'modelmux --help' for full environment variable reference");
+            println!("   • Run 'modelmux config init' to set up configuration interactively");
+            println!("   • Use 'modelmux config validate' for detailed validation");
+            println!("   • Check 'modelmux config show' to see current configuration");
+            1
         }
     }
 }
@@ -353,27 +471,24 @@ fn run_doctor() {
 ///
 /// Returns exit code 0 if valid, 1 if invalid.
 fn run_validate() -> i32 {
-    match Config::from_env() {
-        Ok(config) => {
-            let issues = config.validate();
-            let errors: Vec<_> = issues.iter().filter(|i| i.severity == config::ValidationSeverity::Error).collect();
+    println!("⚠️  The 'validate' command is deprecated. Use 'modelmux config validate' instead.");
+    println!();
 
-            if errors.is_empty() {
-                println!("[OK] Configuration is valid");
+    match Config::load() {
+        Ok(config) => match config.validate() {
+            Ok(_) => {
+                println!("✅ Configuration is valid");
                 0
-            } else {
-                eprintln!("[ERROR] Configuration validation failed:");
-                for issue in &errors {
-                    eprintln!("  • {}: {}", issue.field, issue.message);
-                    if let Some(suggestion) = &issue.suggestion {
-                        eprintln!("    Suggestion: {}", suggestion);
-                    }
-                }
+            }
+            Err(e) => {
+                println!("❌ Configuration validation failed:");
+                println!("{}", e);
                 1
             }
-        }
+        },
         Err(e) => {
-            eprintln!("[ERROR] Configuration error: {}", e);
+            println!("❌ Failed to load configuration:");
+            println!("{}", e);
             1
         }
     }
@@ -386,7 +501,7 @@ fn run_validate() -> i32 {
 ///  * Configuration object loaded from environment
 ///  * `ProxyError::Config` if required environment variables are missing
 fn initialize_config() -> Result<Config> {
-    Config::from_env()
+    Config::load()
 }
 
 ///
@@ -396,16 +511,11 @@ fn initialize_config() -> Result<Config> {
 ///
 /// # Arguments
 ///  * `config` - application configuration containing log level settings
+/// Initialize logging based on configuration settings.
 fn initialize_logging(config: &Config) {
-    let log_level = match config.log_level {
-        config::LogLevel::Trace => Level::TRACE,
-        config::LogLevel::Debug => Level::DEBUG,
-        config::LogLevel::Info => Level::INFO,
-        config::LogLevel::Warn => Level::WARN,
-        config::LogLevel::Error => Level::ERROR,
-    };
+    let level = config.server.log_level.to_tracing_level();
 
-    tracing_subscriber::fmt().with_max_level(log_level).with_target(false).init();
+    tracing_subscriber::fmt().with_max_level(level).with_target(false).init();
 }
 
 ///
@@ -460,15 +570,18 @@ fn create_router(app_state: Arc<AppState>) -> Router {
 ///  * `Ok(())` when server shuts down gracefully
 ///  * `ProxyError::Http` if server binding or startup fails
 async fn start_server(config: &Config, app: Router) -> Result<()> {
-    let listener =
-        tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port)).await.map_err(|e| {
-            let error_msg = format!("Failed to bind to port {}: {}", config.port, e);
-            
-            // Check if it's an "Address already in use" error and provide helpful suggestions
-            let error_str = e.to_string();
-            if error_str.contains("Address already in use") || error_str.contains("address already in use") {
-                let suggestions = format!(
-                    "{}\n\n\
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.server.port))
+        .await
+        .map_err(|e| {
+        let error_msg = format!("Failed to bind to port {}: {}", config.server.port, e);
+
+        // Check if it's an "Address already in use" error and provide helpful suggestions
+        let error_str = e.to_string();
+        if error_str.contains("Address already in use")
+            || error_str.contains("address already in use")
+        {
+            let suggestions = format!(
+                "{}\n\n\
                     Port {} is already in use. Here are some solutions:\n\n\
                     1. Close the other instance:\n\
                        • Find the process using port {}:\n\
@@ -481,21 +594,25 @@ async fn start_server(config: &Config, app: Router) -> Result<()> {
                        export PORT=3001\n\
                        modelmux\n\n\
                     Run 'modelmux doctor' for more help.",
-                    error_msg, config.port, config.port, config.port, config.port
-                );
-                crate::error::ProxyError::Http(suggestions)
-            } else {
-                crate::error::ProxyError::Http(format!(
-                    "{}\n\n\
+                error_msg,
+                config.server.port,
+                config.server.port,
+                config.server.port,
+                config.server.port
+            );
+            crate::error::ProxyError::Http(suggestions)
+        } else {
+            crate::error::ProxyError::Http(format!(
+                "{}\n\n\
                     To fix this:\n\
                     • Check if the port is valid (1-65535)\n\
                     • Ensure you have permission to bind to the port\n\
                     • Try a different port: export PORT=3001\n\n\
                     Run 'modelmux doctor' for more help.",
-                    error_msg
-                ))
-            }
-        })?;
+                error_msg
+            ))
+        }
+    })?;
 
     log_startup_info(config);
 
@@ -515,15 +632,18 @@ async fn start_server(config: &Config, app: Router) -> Result<()> {
 /// # Arguments
 ///  * `config` - application configuration
 fn log_startup_info(config: &Config) {
-    info!("ModelMux v{} running on port {}", VERSION, config.port);
+    info!("ModelMux v{} running on port {}", VERSION, config.server.port);
     info!("Proxy supports tool/function calling for file creation and editing");
-    info!("OpenAI-compatible endpoint: http://localhost:{}/v1", config.port);
+    info!("OpenAI-compatible endpoint: http://localhost:{}/v1", config.server.port);
 
-    if config.log_level.is_trace_enabled() {
+    if matches!(
+        config.server.log_level,
+        crate::config::LogLevel::Trace | crate::config::LogLevel::Debug
+    ) {
         info!(
-            "[TRACE] Trace logging is ENABLED (AISRV_LOG_LEVEL={:?}) - tool calls and interactions will \
+            "[TRACE] Trace logging is ENABLED (LOG_LEVEL={:?}) - tool calls and interactions will \
        be logged",
-            config.log_level
+            config.server.log_level
         );
     }
 }

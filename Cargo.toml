@@ -53,7 +53,9 @@ async-trait = "0.1"
 hyper-util = "0.1"
 
 # Configuration
-dotenvy = "0.15"
+directories = "5.0"
+toml = "0.8"
+shellexpand = "3.1"
 
 # Logging
 tracing = "0.1"
@@ -79,6 +81,7 @@ tokio-test = "0.4"
 base64 = "0.22"
 reqwest = { version = "0.13", features = ["json"] }
 temp-env = "0.3"
+tempfile = "3.8"
 
 
 [profile.release]

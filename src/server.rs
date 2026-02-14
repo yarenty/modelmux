@@ -29,9 +29,9 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::auth::RequestAuth;
 use crate::config::Config;
-use crate::provider::LlmProviderBackend;
 use crate::converter::{AnthropicToOpenAiConverter, OpenAiToAnthropicConverter};
 use crate::error::{ProxyError, Result};
+use crate::provider::LlmProviderBackend;
 
 /* --- types ----------------------------------------------------------------------------------- */
 
@@ -132,11 +132,13 @@ impl AppState {
     ///  * Application state with initialized dependencies
     ///  * `ProxyError` if initialization fails
     pub async fn new(config: Config) -> Result<Self> {
-        let request_auth =
-            RequestAuth::from_strategy(config.llm_provider.auth_strategy()).await?;
+        let request_auth = match &config.llm_provider {
+            Some(provider) => RequestAuth::from_strategy(provider.auth_strategy()).await?,
+            None => return Err(ProxyError::Config("LLM provider not configured".to_string())),
+        };
         let http_client = Self::create_http_client()?;
-        let openai_to_anthropic = OpenAiToAnthropicConverter::new(config.log_level);
-        let anthropic_to_openai = AnthropicToOpenAiConverter::new(config.log_level);
+        let openai_to_anthropic = OpenAiToAnthropicConverter::new(config.server.log_level);
+        let anthropic_to_openai = AnthropicToOpenAiConverter::new(config.server.log_level);
         let metrics = AppMetrics::default();
 
         Ok(Self {
@@ -347,7 +349,7 @@ async fn make_vertex_request_with_retry(
     anthropic_request: &crate::converter::openai_to_anthropic::AnthropicRequest,
     auth_header: &str,
 ) -> Result<reqwest::Response> {
-    if !state.config.enable_retries {
+    if !state.config.server.enable_retries {
         return make_vertex_request(state, anthropic_request, auth_header).await;
     }
 
@@ -359,7 +361,7 @@ async fn make_vertex_request_with_retry(
 
         match response {
             Ok(resp) => return Ok(resp),
-            Err(ProxyError::Http(msg)) if attempts < state.config.max_retry_attempts => {
+            Err(ProxyError::Http(msg)) if attempts < state.config.server.max_retry_attempts => {
                 if msg.contains("Rate limit") || msg.contains("Quota exceeded") {
                     state.metrics.quota_errors.fetch_add(1, Ordering::Relaxed);
                     state.metrics.retry_attempts.fetch_add(1, Ordering::Relaxed);
@@ -370,7 +372,7 @@ async fn make_vertex_request_with_retry(
              Total retries: {}",
                         delay_secs,
                         attempts,
-                        state.config.max_retry_attempts,
+                        state.config.server.max_retry_attempts,
                         state.metrics.quota_errors.load(Ordering::Relaxed),
                         state.metrics.retry_attempts.load(Ordering::Relaxed)
                     );
@@ -651,10 +653,11 @@ fn determine_streaming_behavior(
 ) -> (bool, bool) {
     use crate::config::StreamingMode;
 
-    match config.streaming_mode {
-        StreamingMode::NonStreaming => (true, false),
-        StreamingMode::Standard => (false, false),
+    match config.streaming.mode {
+        StreamingMode::Never => (true, false),
+        StreamingMode::Standard => (false, true),
         StreamingMode::Buffered => (false, true),
+        StreamingMode::Always => (false, true),
         StreamingMode::Auto => {
             let should_force_non_streaming = detect_problematic_client(headers);
             let should_use_buffered_streaming =
@@ -1448,9 +1451,13 @@ mod tests {
 
     #[test]
     fn test_determine_streaming_behavior_auto_mode() {
-        use crate::config::{Config, LogLevel, ServiceAccountKey, StreamingMode};
+        use crate::config::{
+            AuthConfig, Config, LogLevel, ServerConfig, ServiceAccountKey, StreamingConfig,
+            StreamingMode,
+        };
 
         let service_account_key = ServiceAccountKey {
+            account_type: "service_account".to_string(),
             project_id: "test".to_string(),
             private_key_id: "test".to_string(),
             private_key: "test".to_string(),
@@ -1460,6 +1467,7 @@ mod tests {
             token_uri: "test".to_string(),
             auth_provider_x509_cert_url: "test".to_string(),
             client_x509_cert_url: "test".to_string(),
+            universe_domain: None,
         };
         let vertex = VertexProvider {
             predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
@@ -1467,12 +1475,19 @@ mod tests {
             auth: AuthStrategy::GcpOAuth2(service_account_key),
         };
         let config = Config {
-            llm_provider: LlmProviderConfig::Vertex(vertex),
-            port: 3000,
-            log_level: LogLevel::Info,
-            enable_retries: true,
-            max_retry_attempts: 3,
-            streaming_mode: StreamingMode::Auto,
+            server: ServerConfig {
+                port: 3000,
+                log_level: LogLevel::Info,
+                enable_retries: true,
+                max_retry_attempts: 3,
+            },
+            auth: AuthConfig::default(),
+            streaming: StreamingConfig {
+                mode: StreamingMode::Auto,
+                buffer_size: 65536,
+                chunk_timeout_ms: 5000,
+            },
+            llm_provider: Some(LlmProviderConfig::Vertex(vertex)),
         };
 
         // Test with CLI client that can't handle SSE (goose)
@@ -1500,9 +1515,13 @@ mod tests {
 
     #[test]
     fn test_determine_streaming_behavior_non_streaming_mode() {
-        use crate::config::{Config, LogLevel, ServiceAccountKey, StreamingMode};
+        use crate::config::{
+            AuthConfig, Config, LogLevel, ServerConfig, ServiceAccountKey, StreamingConfig,
+            StreamingMode,
+        };
 
         let service_account_key = ServiceAccountKey {
+            account_type: "service_account".to_string(),
             project_id: "test".to_string(),
             private_key_id: "test".to_string(),
             private_key: "test".to_string(),
@@ -1512,6 +1531,7 @@ mod tests {
             token_uri: "test".to_string(),
             auth_provider_x509_cert_url: "test".to_string(),
             client_x509_cert_url: "test".to_string(),
+            universe_domain: None,
         };
         let vertex = VertexProvider {
             predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
@@ -1519,12 +1539,19 @@ mod tests {
             auth: AuthStrategy::GcpOAuth2(service_account_key),
         };
         let config = Config {
-            llm_provider: LlmProviderConfig::Vertex(vertex),
-            port: 3000,
-            log_level: LogLevel::Info,
-            enable_retries: true,
-            max_retry_attempts: 3,
-            streaming_mode: StreamingMode::NonStreaming,
+            server: ServerConfig {
+                port: 3000,
+                log_level: LogLevel::Info,
+                enable_retries: true,
+                max_retry_attempts: 3,
+            },
+            auth: AuthConfig::default(),
+            streaming: StreamingConfig {
+                mode: StreamingMode::Never,
+                buffer_size: 65536,
+                chunk_timeout_ms: 5000,
+            },
+            llm_provider: Some(LlmProviderConfig::Vertex(vertex)),
         };
 
         let headers = HeaderMap::new();
