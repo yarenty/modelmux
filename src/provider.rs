@@ -76,6 +76,7 @@ impl VertexProvider {
     ///
     /// Requires `LLM_PROVIDER=vertex` (or unset). URL from `LLM_URL` or from
     /// `VERTEX_REGION`, `VERTEX_PROJECT`, `VERTEX_LOCATION`, `VERTEX_PUBLISHER`, `VERTEX_MODEL_ID`.
+    #[allow(dead_code)]
     pub fn from_env() -> Result<Self> {
         let service_account_key = Self::load_service_account_key()?;
         let (predict_resource_url, display_model) = Self::resolve_predict_url_and_model()?;
@@ -96,6 +97,7 @@ impl VertexProvider {
         Ok(Self { predict_resource_url, display_model, auth })
     }
 
+    #[allow(dead_code)]
     fn load_service_account_key() -> Result<ServiceAccountKey> {
         crate::config::Config::load_service_account_key_standalone()
     }
@@ -306,6 +308,7 @@ impl LlmProviderConfig {
     /// Load the provider config from environment based on `LLM_PROVIDER`.
     ///
     /// Defaults to `vertex` when unset. Supported: `vertex`, `openai_compatible` (stub).
+    #[allow(dead_code)]
     pub fn from_env() -> Result<Self> {
         let id = env::var("LLM_PROVIDER").unwrap_or_else(|_| "vertex".to_string());
         let id = id.trim().to_lowercase();

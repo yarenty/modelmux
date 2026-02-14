@@ -105,7 +105,7 @@ impl<'a> ConfigValidator<'a> {
         let server = &self.config.server;
 
         // Validate port range
-        if server.port == 0 || server.port > 65535 {
+        if server.port == 0 {
             self.add_error(format!(
                 "Invalid server port {}: must be between 1 and 65535",
                 server.port
@@ -464,6 +464,7 @@ impl<'a> ConfigValidator<'a> {
 /// # Returns
 /// * `Ok(())` - Value is valid
 /// * `Err(ProxyError)` - Validation failed
+#[allow(dead_code)]
 pub fn validate_field<T, F>(value: &T, field_name: &str, validator: F) -> Result<()>
 where
     F: FnOnce(&T) -> Result<()>,
@@ -586,13 +587,13 @@ mod tests {
     fn test_validate_field_utility() {
         let port = 8080u16;
         let result = validate_field(&port, "port", |p| {
-            if *p > 65535 { Err(ProxyError::Config("too high".to_string())) } else { Ok(()) }
+            if *p == 0 { Err(ProxyError::Config("cannot be zero".to_string())) } else { Ok(()) }
         });
         assert!(result.is_ok());
 
-        let bad_port = 70000u32;
+        let bad_port = 0u16;
         let result = validate_field(&bad_port, "port", |p| {
-            if *p > 65535 { Err(ProxyError::Config("too high".to_string())) } else { Ok(()) }
+            if *p == 0 { Err(ProxyError::Config("cannot be zero".to_string())) } else { Ok(()) }
         });
         assert!(result.is_err());
     }

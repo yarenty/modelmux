@@ -73,6 +73,7 @@ pub fn user_config_dir() -> Result<PathBuf> {
 /// # Returns
 /// * `Ok(PathBuf)` - Path to user data directory
 /// * `Err(ProxyError)` - Unable to determine or create data directory
+#[allow(dead_code)]
 pub fn user_data_dir() -> Result<PathBuf> {
     let project_dirs = get_project_dirs()?;
     let data_dir = project_dirs.data_dir();
@@ -93,6 +94,7 @@ pub fn user_data_dir() -> Result<PathBuf> {
 /// # Returns
 /// * `Ok(PathBuf)` - Path to user cache directory
 /// * `Err(ProxyError)` - Unable to determine or create cache directory
+#[allow(dead_code)]
 pub fn user_cache_dir() -> Result<PathBuf> {
     let project_dirs = get_project_dirs()?;
     let cache_dir = project_dirs.cache_dir();

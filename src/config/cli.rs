@@ -476,32 +476,6 @@ impl ConfigCli {
         Ok(config)
     }
 
-    /// Prompt for a string value
-    fn prompt_string(prompt: &str, current: &str) -> Result<String> {
-        loop {
-            if current.is_empty() {
-                print!("{}: ", prompt);
-            } else {
-                print!("{} [{}]: ", prompt, current);
-            }
-            io::stdout().flush().unwrap();
-
-            let mut input = String::new();
-            io::stdin()
-                .read_line(&mut input)
-                .map_err(|e| ProxyError::Config(format!("Failed to read input: {}", e)))?;
-
-            let input = input.trim();
-            if input.is_empty() && !current.is_empty() {
-                return Ok(current.to_string());
-            } else if !input.is_empty() {
-                return Ok(input.to_string());
-            }
-
-            println!("Please enter a value.");
-        }
-    }
-
     /// Prompt for a string value with a specific default
     fn prompt_string_with_default(prompt: &str, current: &str, default: &str) -> Result<String> {
         let display_current = if current.is_empty() { default } else { current };

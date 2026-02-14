@@ -340,6 +340,7 @@ impl Config {
     }
 
     /// Legacy method for loading service account key (for backward compatibility)
+    #[allow(dead_code)]
     pub fn load_service_account_key_standalone() -> Result<ServiceAccountKey> {
         // Load auth config directly to avoid circular dependency
         let auth_config =
@@ -551,16 +552,19 @@ impl StreamingMode {
     }
 
     /// Check if this mode supports streaming
+    #[allow(dead_code)]
     pub fn is_streaming(&self) -> bool {
         !matches!(self, StreamingMode::Never)
     }
 
     /// Check if this mode should auto-detect client behavior
+    #[allow(dead_code)]
     pub fn is_auto_detect(&self) -> bool {
         matches!(self, StreamingMode::Auto)
     }
 
     /// Convert to legacy NonStreaming variant (backward compatibility)
+    #[allow(dead_code)]
     pub fn is_non_streaming(&self) -> bool {
         matches!(self, StreamingMode::Never)
     }

@@ -144,6 +144,7 @@ impl ConfigLoader {
     /// # Returns
     /// * `Ok(Self)` - Config loaded successfully
     /// * `Err(ProxyError)` - Failed to load or parse config file
+    #[allow(dead_code)]
     pub fn with_config_file<P: AsRef<Path>>(mut self, path: P) -> Result<Self> {
         let path = path.as_ref();
         tracing::debug!("Loading custom config from: {}", path.display());
@@ -190,6 +191,7 @@ impl ConfigLoader {
     /// # Returns
     /// * `Ok(Config)` - Valid, fully-loaded configuration
     /// * `Err(ProxyError)` - Configuration validation failed
+    #[allow(dead_code)]
     pub fn build(self) -> Result<Config> {
         if !self.defaults_applied {
             return Err(ProxyError::Config(
