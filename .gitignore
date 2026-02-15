@@ -22,3 +22,6 @@ install.log
 install.tar.gz
 /.env
 .idea
+
+# Local cargo configuration (build optimizations)
+.cargo/config.toml
