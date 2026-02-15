@@ -1487,6 +1487,7 @@ mod tests {
                 buffer_size: 65536,
                 chunk_timeout_ms: 5000,
             },
+            vertex: None,
             llm_provider: Some(LlmProviderConfig::Vertex(vertex)),
         };
 
@@ -1551,6 +1552,7 @@ mod tests {
                 buffer_size: 65536,
                 chunk_timeout_ms: 5000,
             },
+            vertex: None,
             llm_provider: Some(LlmProviderConfig::Vertex(vertex)),
         };
 

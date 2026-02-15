@@ -293,6 +293,11 @@ impl ConfigLoader {
             self.config.llm_provider = other.llm_provider;
         }
 
+        // Merge vertex config if present
+        if other.vertex.is_some() {
+            self.config.vertex = other.vertex;
+        }
+
         // Merge auth config
         self.merge_auth_config(other.auth);
 

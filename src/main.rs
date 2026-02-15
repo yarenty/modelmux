@@ -153,6 +153,14 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 ///  * `ProxyError` if initialization or server startup fails
 #[tokio::main]
 async fn main() {
+    // Load .env file for legacy environment variable support (before any config loading)
+    if let Err(e) = dotenvy::dotenv() {
+        // Only log at debug level - .env is optional
+        if std::path::Path::new(".env").exists() {
+            eprintln!("Warning: Could not load .env file: {}", e);
+        }
+    }
+
     // Handle CLI arguments before config loading
     if let Some(exit_code) = handle_cli_args().await {
         std::process::exit(exit_code);

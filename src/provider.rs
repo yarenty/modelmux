@@ -12,7 +12,7 @@
 
 use std::env;
 
-use crate::config::ServiceAccountKey;
+use crate::config::{ServiceAccountKey, VertexConfig};
 use crate::error::{ProxyError, Result};
 
 /* --- auth strategy --------------------------------------------------------------------------- */
@@ -79,7 +79,7 @@ impl VertexProvider {
     #[allow(dead_code)]
     pub fn from_env() -> Result<Self> {
         let service_account_key = Self::load_service_account_key()?;
-        let (predict_resource_url, display_model) = Self::resolve_predict_url_and_model()?;
+        let (predict_resource_url, display_model) = Self::resolve_predict_url_and_model(None)?;
         let auth = AuthStrategy::GcpOAuth2(service_account_key);
 
         Ok(Self { predict_resource_url, display_model, auth })
@@ -90,8 +90,21 @@ impl VertexProvider {
     ///
     /// Requires `LLM_PROVIDER=vertex` (or unset). URL from `LLM_URL` or from
     /// `VERTEX_REGION`, `VERTEX_PROJECT`, `VERTEX_LOCATION`, `VERTEX_PUBLISHER`, `VERTEX_MODEL_ID`.
+    #[allow(dead_code)] // Public API, used when loading without config file
     pub fn from_env_with_key(service_account_key: ServiceAccountKey) -> Result<Self> {
-        let (predict_resource_url, display_model) = Self::resolve_predict_url_and_model()?;
+        Self::from_config_or_env_with_key(service_account_key, None)
+    }
+
+    ///
+    /// Load Vertex provider from config file and/or environment.
+    ///
+    /// Config file values take precedence. Falls back to env vars (including from .env).
+    pub fn from_config_or_env_with_key(
+        service_account_key: ServiceAccountKey,
+        vertex_config: Option<&VertexConfig>,
+    ) -> Result<Self> {
+        let (predict_resource_url, display_model) =
+            Self::resolve_predict_url_and_model(vertex_config)?;
         let auth = AuthStrategy::GcpOAuth2(service_account_key);
 
         Ok(Self { predict_resource_url, display_model, auth })
@@ -102,7 +115,19 @@ impl VertexProvider {
         crate::config::Config::load_service_account_key_standalone()
     }
 
-    fn resolve_predict_url_and_model() -> Result<(String, String)> {
+    fn resolve_predict_url_and_model(vertex_config: Option<&VertexConfig>) -> Result<(String, String)> {
+        // 1. Check config file URL override
+        if let Some(cfg) = vertex_config {
+            if let Some(ref url) = cfg.url {
+                if !url.trim().is_empty() {
+                    let resource_url = Self::strip_predict_method_suffix(url.trim());
+                    let display = Self::get_model_display_name_from_config_or_env(cfg)?;
+                    return Ok((resource_url, display));
+                }
+            }
+        }
+
+        // 2. Check env var LLM_URL
         if let Ok(url) = env::var("LLM_URL") {
             if !url.trim().is_empty() {
                 let resource_url = Self::strip_predict_method_suffix(url.trim());
@@ -111,6 +136,16 @@ impl VertexProvider {
             }
         }
 
+        // 3. Check config file vertex fields
+        if let Some(cfg) = vertex_config {
+            if Self::has_vertex_config(cfg) {
+                let resource_url = Self::build_vertex_resource_url_from_config(cfg)?;
+                let display = Self::get_model_display_name_from_config_or_env(cfg)?;
+                return Ok((resource_url, display));
+            }
+        }
+
+        // 4. Check env vars
         if Self::has_vertex_vars() {
             let resource_url = Self::build_vertex_resource_url()?;
             let display = Self::get_model_display_name_vertex()?;
@@ -118,8 +153,18 @@ impl VertexProvider {
         }
 
         Err(ProxyError::Config(
-            "Vertex URL not configured. Use LLM_URL or set VERTEX_REGION, \
-             VERTEX_PROJECT, VERTEX_LOCATION, VERTEX_PUBLISHER, VERTEX_MODEL_ID."
+            "Vertex URL not configured. Set in config.toml under [vertex] or use environment variables:\n\
+             \n\
+             Config file (config.toml):\n\
+               [vertex]\n\
+               project = \"your-gcp-project\"\n\
+               region = \"europe-west1\"\n\
+               location = \"europe-west1\"\n\
+               publisher = \"anthropic\"\n\
+               model = \"claude-3-5-sonnet@20241022\"\n\
+             \n\
+             Or environment variables:\n\
+               LLM_URL=<full-url>  OR  VERTEX_REGION, VERTEX_PROJECT, VERTEX_LOCATION, VERTEX_PUBLISHER, VERTEX_MODEL_ID"
                 .to_string(),
         ))
     }
@@ -135,12 +180,57 @@ impl VertexProvider {
         }
     }
 
+    fn has_vertex_config(cfg: &VertexConfig) -> bool {
+        let project = cfg.project.as_deref().unwrap_or("").trim();
+        let region = cfg.region.as_deref().unwrap_or("").trim();
+        let location = cfg.location.as_deref().unwrap_or("").trim();
+        let publisher = cfg.publisher.as_deref().unwrap_or("").trim();
+        let model = cfg.model.as_deref().unwrap_or("").trim();
+        !project.is_empty()
+            && !region.is_empty()
+            && !location.is_empty()
+            && !publisher.is_empty()
+            && !model.is_empty()
+    }
+
     fn has_vertex_vars() -> bool {
         env::var("VERTEX_REGION").is_ok()
             && env::var("VERTEX_PROJECT").is_ok()
             && env::var("VERTEX_LOCATION").is_ok()
             && env::var("VERTEX_PUBLISHER").is_ok()
             && env::var("VERTEX_MODEL_ID").is_ok()
+    }
+
+    fn build_vertex_resource_url_from_config(cfg: &VertexConfig) -> Result<String> {
+        let region = cfg
+            .region
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .ok_or_else(|| ProxyError::Config("vertex.region is required".to_string()))?;
+        let project = cfg
+            .project
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .ok_or_else(|| ProxyError::Config("vertex.project is required".to_string()))?;
+        let location = cfg
+            .location
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .ok_or_else(|| ProxyError::Config("vertex.location is required".to_string()))?;
+        let publisher = cfg
+            .publisher
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .ok_or_else(|| ProxyError::Config("vertex.publisher is required".to_string()))?;
+        let model_id = cfg
+            .model
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .ok_or_else(|| ProxyError::Config("vertex.model is required".to_string()))?;
+        Ok(format!(
+            "https://{}-aiplatform.googleapis.com/v1/projects/{}/locations/{}/publishers/{}/models/{}",
+            region, project, location, publisher, model_id
+        ))
     }
 
     fn build_vertex_resource_url() -> Result<String> {
@@ -204,6 +294,37 @@ impl VertexProvider {
         }
         Err(ProxyError::Config(
             "Set LLM_MODEL, LLM_MODEL_DISPLAY_NAME, or VERTEX_MODEL_ID for display name."
+                .to_string(),
+        ))
+    }
+
+    fn get_model_display_name_from_config_or_env(cfg: &VertexConfig) -> Result<String> {
+        if let Ok(name) = env::var("LLM_MODEL_DISPLAY_NAME") {
+            if !name.trim().is_empty() {
+                return Ok(name.trim().to_string());
+            }
+        }
+        if let Ok(name) = env::var("LLM_MODEL") {
+            if !name.trim().is_empty() {
+                return Ok(name.trim().to_string());
+            }
+        }
+        if let Some(ref id) = cfg.model {
+            let display = id.trim().split('@').next().unwrap_or(id.trim()).to_string();
+            if !display.is_empty() {
+                return Ok(display);
+            }
+        }
+        // When using cfg.url, try to extract model from URL
+        if let Some(ref url) = cfg.url {
+            let segment = url.trim().rsplit('/').next().unwrap_or("");
+            let display = segment.split('@').next().unwrap_or(segment).to_string();
+            if !display.is_empty() {
+                return Ok(display);
+            }
+        }
+        Err(ProxyError::Config(
+            "Set vertex.model in config or LLM_MODEL / LLM_MODEL_DISPLAY_NAME for display name."
                 .to_string(),
         ))
     }
@@ -328,11 +449,27 @@ impl LlmProviderConfig {
     /// Load the provider config with provided service account key (to avoid circular dependency).
     ///
     /// Defaults to `vertex` when unset. Supported: `vertex`, `openai_compatible` (stub).
+    #[allow(dead_code)] // Public API, used when loading without config file
     pub fn from_env_with_key(service_account_key: ServiceAccountKey) -> Result<Self> {
+        Self::from_config_or_env_with_key(service_account_key, None)
+    }
+
+    ///
+    /// Load the provider config from config file and/or environment.
+    ///
+    /// Config file values take precedence. Falls back to env vars (including from .env).
+    pub fn from_config_or_env_with_key(
+        service_account_key: ServiceAccountKey,
+        vertex_config: Option<&VertexConfig>,
+    ) -> Result<Self> {
         let id = env::var("LLM_PROVIDER").unwrap_or_else(|_| "vertex".to_string());
         let id = id.trim().to_lowercase();
         match id.as_str() {
-            "vertex" => VertexProvider::from_env_with_key(service_account_key).map(Self::Vertex),
+            "vertex" => VertexProvider::from_config_or_env_with_key(
+                service_account_key,
+                vertex_config,
+            )
+            .map(Self::Vertex),
             "openai_compatible" | "openai" | "mistral" | "cloudflare" => {
                 OpenAiCompatibleProvider::from_env().map(Self::OpenAiCompatible)
             }

@@ -142,7 +142,7 @@ Use the interactive configuration wizard:
 modelmux config init
 ```
 
-Or create a configuration file manually at `~/.config/modelmux/config.toml`:
+Or create a configuration file manually. On macOS: `~/Library/Application Support/com.SkyCorp.modelmux/config.toml` (or `~/.config/modelmux/config.toml` on Linux):
 
 ```toml
 [server]
@@ -153,9 +153,17 @@ max_retry_attempts = 3
 
 [auth]
 # Path to Google Cloud service account JSON file
-service_account_file = "~/.config/modelmux/service-account.json"
+service_account_file = "~/Library/Application Support/com.SkyCorp.modelmux/service-account.json"
 # Or inline JSON for containers:
 # service_account_json = '{"type": "service_account", ...}'
+
+[vertex]
+# Vertex AI provider - set these OR use env vars (.env supported)
+project = "{your-project}"
+region = "{your-region}"
+location = "{your-region}"
+publisher = "anthropic"
+model = "{your-model}"
 
 [streaming]
 mode = "auto"  # auto, never, standard, buffered, always
@@ -163,7 +171,7 @@ buffer_size = 65536
 chunk_timeout_ms = 5000
 ```
 
-**Note**: Provider configuration (LLM_PROVIDER, VERTEX_* variables) is still handled via environment variables for backward compatibility.
+**Note**: You can also use a `.env` file or environment variables (`VERTEX_PROJECT`, `VERTEX_REGION`, etc.) for provider config.
 
 ### 2. Run ModelMux
 
@@ -227,6 +235,14 @@ service_account_file = "~/.config/modelmux/service-account.json"
 # Alternative: Inline JSON (for containers)
 # service_account_json = '{"type": "service_account", ...}'
 
+[vertex]
+# Vertex AI provider (config file OR env vars / .env)
+project = "{your-project}"
+region = "{your-region}"
+location = "{your-region}"
+publisher = "{your publisher}}"
+model = "{your-model}"
+
 [streaming]
 mode = "auto"             # auto, never, standard, buffered, always
 buffer_size = 65536
@@ -249,22 +265,26 @@ modelmux config validate
 modelmux config edit
 ```
 
-### Environment Variables (Legacy)
+### Environment Variables and .env
 
-Still supported for backward compatibility:
+Supported for backward compatibility. Place a `.env` file in your project directory or current working directory:
 
 ```bash
-# Provider configuration (still required)
-export LLM_PROVIDER=vertex
-export VERTEX_PROJECT=my-gcp-project
-export VERTEX_LOCATION=europe-west1
-export VERTEX_MODEL_ID=claude-3-5-sonnet@20241022
+# Provider configuration
+LLM_PROVIDER=vertex
+VERTEX_PROJECT=my-gcp-project
+VERTEX_REGION=europe-west1
+VERTEX_LOCATION=europe-west1
+VERTEX_PUBLISHER=anthropic
+VERTEX_MODEL_ID=claude-3-5-sonnet@20241022
 
 # Configuration overrides (use MODELMUX_ prefix)
-export MODELMUX_SERVER_PORT=3000
-export MODELMUX_SERVER_LOG_LEVEL=info
-export MODELMUX_AUTH_SERVICE_ACCOUNT_FILE=/path/to/key.json
+MODELMUX_SERVER_PORT=3000
+MODELMUX_SERVER_LOG_LEVEL=info
+MODELMUX_AUTH_SERVICE_ACCOUNT_FILE=/path/to/key.json
 ```
+
+The `.env` file is loaded automatically when modelmux starts (from the current working directory).
 
 <!-- "Time flies like an arrow; fruit flies like a banana." - Groucho Marx -->
 

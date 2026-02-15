@@ -47,10 +47,40 @@ pub struct Config {
     pub auth: AuthConfig,
     /// Streaming behavior configuration
     pub streaming: StreamingConfig,
+    /// Vertex AI provider configuration (optional; env vars used if not set)
+    #[serde(default)]
+    pub vertex: Option<VertexConfig>,
 
     /// LLM provider configuration (loaded separately, not serialized)
     #[serde(skip)]
     pub llm_provider: Option<LlmProviderConfig>,
+}
+
+///
+/// Vertex AI provider configuration.
+///
+/// Can be set in TOML under `[vertex]` or via environment variables
+/// (VERTEX_PROJECT, VERTEX_REGION, etc.). Config file takes precedence over env.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VertexConfig {
+    /// GCP project ID
+    #[serde(alias = "project_id")]
+    pub project: Option<String>,
+    /// Vertex region (e.g. europe-west1)
+    #[serde(default)]
+    pub region: Option<String>,
+    /// Vertex location (often same as region)
+    #[serde(default)]
+    pub location: Option<String>,
+    /// Model publisher (e.g. anthropic)
+    #[serde(default)]
+    pub publisher: Option<String>,
+    /// Model ID (e.g. claude-3-5-sonnet@20241022)
+    #[serde(alias = "model_id")]
+    pub model: Option<String>,
+    /// Full URL override (alternative to region/project/location/publisher/model)
+    #[serde(default)]
+    pub url: Option<String>,
 }
 
 ///
@@ -249,6 +279,7 @@ impl Default for Config {
             server: ServerConfig::default(),
             auth: AuthConfig::default(),
             streaming: StreamingConfig::default(),
+            vertex: None,
             // Provider will be loaded separately
             llm_provider: None,
         }
@@ -320,8 +351,11 @@ impl Config {
         // Load service account key from auth config to avoid circular dependency
         let service_account_key = Self::load_service_account_key_from_auth(&base_config.auth)?;
 
-        // Then load provider config with the service account key
-        base_config.llm_provider = Some(LlmProviderConfig::from_env_with_key(service_account_key)?);
+        // Then load provider config (from vertex config, env vars, or .env)
+        base_config.llm_provider = Some(LlmProviderConfig::from_config_or_env_with_key(
+            service_account_key,
+            base_config.vertex.as_ref(),
+        )?);
 
         Ok(base_config)
     }
@@ -488,16 +522,23 @@ buffer_size = 65536
 # Timeout for streaming chunks in milliseconds (default: 5000)
 chunk_timeout_ms = 5000
 
-# Note: LLM provider configuration is handled via environment variables:
-# LLM_PROVIDER=vertex (or openai_compatible)
-# For Vertex AI:
-#   VERTEX_PROJECT=your-gcp-project
-#   VERTEX_LOCATION=us-central1
-#   VERTEX_PUBLISHER=anthropic
-#   VERTEX_MODEL_ID=claude-3-5-sonnet@20241022
-# For OpenAI-compatible:
-#   OPENAI_API_BASE=https://api.example.com
-#   OPENAI_API_KEY=your-api-key
+# Vertex AI provider (optional - can also use env vars or .env)
+[vertex]
+project = "your-gcp-project"
+region = "europe-west1"
+location = "europe-west1"
+publisher = "anthropic"
+model = "claude-3-5-sonnet@20241022"
+# Or use full URL override instead:
+# url = "https://europe-west1-aiplatform.googleapis.com/v1/projects/MY_PROJECT/locations/europe-west1/publishers/anthropic/models/claude-3-5-sonnet@20241022"
+
+# Alternative: use environment variables (including from .env file):
+# LLM_PROVIDER=vertex
+# VERTEX_PROJECT=your-gcp-project
+# VERTEX_REGION=europe-west1
+# VERTEX_LOCATION=europe-west1
+# VERTEX_PUBLISHER=anthropic
+# VERTEX_MODEL_ID=claude-3-5-sonnet@20241022
 "#
     }
 }

@@ -2,6 +2,21 @@
 
 use modelmux::config::{Config, LogLevel, StreamingMode};
 use temp_env::with_vars;
+use tempfile::TempDir;
+
+/// Run a test with HOME set to an empty temp dir so no user config file is loaded.
+/// This ensures tests run in isolation regardless of the developer's config.
+fn with_isolated_home<F, V>(vars: V, f: F)
+where
+    F: FnOnce(),
+    V: IntoIterator<Item = (&'static str, Option<String>)>,
+{
+    let temp_dir = TempDir::new().expect("temp dir");
+    let home = temp_dir.path().to_string_lossy().to_string();
+    let mut all_vars: Vec<(&'static str, Option<String>)> = vec![("HOME", Some(home))];
+    all_vars.extend(vars);
+    with_vars(all_vars, f);
+}
 
 /// Helper function to get JSON service account key
 fn get_test_key_json() -> &'static str {
@@ -11,15 +26,15 @@ fn get_test_key_json() -> &'static str {
 /// Test that configuration loads with minimal required environment variables
 #[test]
 fn test_config_load_with_required_vars() {
-    with_vars(
+    with_isolated_home(
         vec![
-            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
-            ("LLM_PROVIDER", Some("vertex")),
-            ("VERTEX_REGION", Some("us-central1")),
-            ("VERTEX_PROJECT", Some("test-project")),
-            ("VERTEX_LOCATION", Some("us-central1")),
-            ("VERTEX_PUBLISHER", Some("anthropic")),
-            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json().to_string())),
+            ("LLM_PROVIDER", Some("vertex".to_string())),
+            ("VERTEX_REGION", Some("us-central1".to_string())),
+            ("VERTEX_PROJECT", Some("test-project".to_string())),
+            ("VERTEX_LOCATION", Some("us-central1".to_string())),
+            ("VERTEX_PUBLISHER", Some("anthropic".to_string())),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022".to_string())),
         ],
         || {
             let config = Config::load().expect("Should load config with required vars");
@@ -123,15 +138,15 @@ fn test_log_level_parsing() {
 /// Test default log level
 #[test]
 fn test_default_log_level() {
-    with_vars(
+    with_isolated_home(
         vec![
-            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json())),
-            ("LLM_PROVIDER", Some("vertex")),
-            ("VERTEX_REGION", Some("us-central1")),
-            ("VERTEX_PROJECT", Some("test-project")),
-            ("VERTEX_LOCATION", Some("us-central1")),
-            ("VERTEX_PUBLISHER", Some("anthropic")),
-            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+            ("MODELMUX_AUTH_SERVICE_ACCOUNT_JSON", Some(get_test_key_json().to_string())),
+            ("LLM_PROVIDER", Some("vertex".to_string())),
+            ("VERTEX_REGION", Some("us-central1".to_string())),
+            ("VERTEX_PROJECT", Some("test-project".to_string())),
+            ("VERTEX_LOCATION", Some("us-central1".to_string())),
+            ("VERTEX_PUBLISHER", Some("anthropic".to_string())),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022".to_string())),
         ],
         || {
             let config = Config::load().expect("Should load config");
@@ -248,14 +263,14 @@ fn test_default_retry_config() {
 /// Test that config fails without required auth configuration
 #[test]
 fn test_config_fails_without_auth() {
-    with_vars(
+    with_isolated_home(
         vec![
-            ("LLM_PROVIDER", Some("vertex")),
-            ("VERTEX_REGION", Some("us-central1")),
-            ("VERTEX_PROJECT", Some("test-project")),
-            ("VERTEX_LOCATION", Some("us-central1")),
-            ("VERTEX_PUBLISHER", Some("anthropic")),
-            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022")),
+            ("LLM_PROVIDER", Some("vertex".to_string())),
+            ("VERTEX_REGION", Some("us-central1".to_string())),
+            ("VERTEX_PROJECT", Some("test-project".to_string())),
+            ("VERTEX_LOCATION", Some("us-central1".to_string())),
+            ("VERTEX_PUBLISHER", Some("anthropic".to_string())),
+            ("VERTEX_MODEL_ID", Some("claude-3-5-sonnet@20241022".to_string())),
         ],
         || {
             let result = Config::load();
