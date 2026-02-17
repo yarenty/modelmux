@@ -6,7 +6,7 @@ class Modelmux < Formula
   desc "High-performance proxy server converting OpenAI API requests to Vertex AI format"
   homepage "https://github.com/yarenty/modelmux"
   url "https://github.com/yarenty/modelmux/archive/refs/tags/v1.0.0.tar.gz"
-  sha256 "4dec17f06c9ef6d6848d120a9b91b31633d99256d8e4ba2fef0a8c38dffddc97"
+  sha256 "05c1ed6868298287e9c33c058a57340a0aca676fadb0e135147f8692fac58b13"
   license any_of: ["MIT", "Apache-2.0"]
   head "https://github.com/yarenty/modelmux.git", branch: "main"
 
