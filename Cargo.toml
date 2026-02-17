@@ -1,6 +1,6 @@
 [package]
 name = "modelmux"
-version = "0.6.1"
+version = "1.0.0"
 edition = "2024"
 authors = ["Jaro <yarenty@gmail.com>"]
 description = "ModelMux - high-performance Rust gateway that translates OpenAI-compatible API requests to Vertex AI (Claude), with streaming, tool calling, and production-grade reliability."
@@ -32,6 +32,18 @@ path = "src/lib.rs"
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.deb]
+maintainer = "Jaro <yarenty@gmail.com>"
+section = "net"
+depends = "$auto"
+extended-description = """\
+ModelMux is a high-performance proxy server that converts OpenAI-compatible
+API requests to Vertex AI (Anthropic Claude) format. Supports streaming,
+tool calling, and production-grade reliability.
+."""
+maintainer-scripts = "packaging/debian"
+systemd-units = { enable = true }
 
 [dependencies]
 # HTTP server framework

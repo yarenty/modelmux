@@ -1,6 +1,6 @@
 # Release Process
 
-Step-by-step guide for releasing new versions of ModelMux, including Homebrew deployment.
+Step-by-step guide for releasing new versions of ModelMux, including Homebrew and Linux/Ubuntu deployment.
 
 ## Quick Release Checklist
 
@@ -130,9 +130,13 @@ To re-test after changing the formula, copy again and run `brew reinstall yarent
 
 ### 8. Publish to Homebrew tap
 
-Tap repo: **https://github.com/yarenty/homebrew-tap**
+Use the release script (updates formula and pushes to tap):
 
-**Update formula and push** (after a new release: bump version + SHA256 in `packaging/homebrew/modelmux.rb`, then):
+```bash
+./packaging/release.sh
+```
+
+Or manually:
 
 ```bash
 TAP_DIR=$(brew --repository yarenty/tap)
@@ -149,7 +153,48 @@ git push origin main
 
 [Semantic Versioning](https://semver.org/): MAJOR.MINOR.PATCH (breaking / feature / fix)
 
+## Linux / Ubuntu Release
+
+Linux binaries and `.deb` packages are built automatically by GitHub Actions when you push a tag. No separate script is needed.
+
+### What Gets Published
+
+On `git push origin v*.*.*`, the release workflow:
+
+1. Builds binaries for: Linux (x86_64, aarch64), macOS (x64, arm64), Windows (x64)
+2. Builds `.deb` packages for Ubuntu/Debian (amd64, arm64) — includes systemd unit
+3. Creates a GitHub Release with all artifacts
+
+### Install on Ubuntu
+
+**Option A: Download from GitHub Releases**
+
+```bash
+# Download .deb for your arch (amd64 or arm64)
+wget https://github.com/yarenty/modelmux/releases/download/v0.6.1/modelmux_0.6.1_amd64.deb
+sudo dpkg -i modelmux_0.6.1_amd64.deb
+sudo systemctl enable --now modelmux
+```
+
+**Option B: Download tarball**
+
+```bash
+wget https://github.com/yarenty/modelmux/releases/download/v0.6.1/modelmux-x86_64-unknown-linux-gnu.tar.gz
+tar xzf modelmux-x86_64-unknown-linux-gnu.tar.gz
+sudo cp modelmux /usr/local/bin/
+# Then install systemd unit from packaging/systemd/ (see packaging/systemd/README.md)
+```
+
+### Build .deb Locally (for testing)
+
+```bash
+cargo install cargo-deb
+./packaging/release-linux.sh              # Current arch (Linux only)
+./packaging/release-linux.sh --all        # amd64 + arm64
+```
+
 ## See Also
 
 - [TESTING.md](TESTING.md) - Testing guide
+- [packaging/systemd/README.md](../packaging/systemd/README.md) - systemd service setup
 - [Homebrew Formula Cookbook](https://docs.brew.sh/Formula-Cookbook)

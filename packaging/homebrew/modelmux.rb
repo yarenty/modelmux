@@ -5,7 +5,7 @@
 class Modelmux < Formula
   desc "High-performance proxy server converting OpenAI API requests to Vertex AI format"
   homepage "https://github.com/yarenty/modelmux"
-  url "https://github.com/yarenty/modelmux/archive/refs/tags/v0.6.1.tar.gz"
+  url "https://github.com/yarenty/modelmux/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "4dec17f06c9ef6d6848d120a9b91b31633d99256d8e4ba2fef0a8c38dffddc97"
   license any_of: ["MIT", "Apache-2.0"]
   head "https://github.com/yarenty/modelmux.git", branch: "main"
@@ -14,6 +14,28 @@ class Modelmux < Formula
 
   def install
     system "cargo", "install", *std_cargo_args
+    (var/"log").mkpath
+  end
+
+  service do
+    run [opt_bin/"modelmux"]
+    keep_alive true
+    log_path var/"log/modelmux.log"
+    error_log_path var/"log/modelmux.log"
+  end
+
+  def caveats
+    <<~EOS
+      ModelMux runs as an HTTP proxy. Configure it with:
+        modelmux config init
+
+      To run ModelMux as a background service:
+        brew services start modelmux
+
+      The service will use your config from:
+        ~/.config/modelmux/config.toml (Linux)
+        ~/Library/Application Support/modelmux/config.toml (macOS)
+    EOS
   end
 
   test do

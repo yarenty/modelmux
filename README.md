@@ -181,6 +181,10 @@ modelmux
 cargo run --release
 ```
 
+**Homebrew (macOS):** Run as a background service with `brew services start modelmux` (start/stop/restart like PostgreSQL or Redis).
+
+**Linux (systemd):** Run as a daemon with systemd — see [packaging/systemd/README.md](packaging/systemd/README.md).
+
 ### 3. Validate and start
 
 ```bash

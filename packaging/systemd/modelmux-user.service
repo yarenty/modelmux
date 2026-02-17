@@ -1,0 +1,18 @@
+# User service - install to ~/.config/systemd/user/
+# Uses ~/.config/modelmux/config.toml (create with: modelmux config init)
+# Start with: systemctl --user start modelmux
+[Unit]
+Description=ModelMux - OpenAI proxy for Vertex AI (user service)
+Documentation=https://github.com/yarenty/modelmux
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Assumes modelmux is in PATH (e.g. ~/.cargo/bin from cargo install)
+ExecStart=modelmux
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

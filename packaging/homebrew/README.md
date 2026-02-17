@@ -14,6 +14,21 @@ packaging/
 
 ## Usage
 
+### Running as a Service
+
+ModelMux can be run as a background service (like PostgreSQL or Redis):
+
+```bash
+brew services start modelmux   # Start and run at login
+brew services stop modelmux   # Stop the service
+brew services restart modelmux # Restart
+brew services list           # See status
+```
+
+Configure ModelMux first with `modelmux config init` before starting the service.
+
+**Linux users:** For native systemd (without Homebrew), see [../systemd/README.md](../systemd/README.md).
+
 ### Testing Locally
 
 1. **One-time:** Create a local tap (replace `yarenty` with your GitHub username):

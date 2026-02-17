@@ -1,0 +1,32 @@
+[Unit]
+Description=ModelMux - OpenAI-compatible proxy for Vertex AI
+Documentation=https://github.com/yarenty/modelmux
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/modelmux
+Restart=on-failure
+RestartSec=5
+
+# Configuration: uses /etc/modelmux/config.toml (system) or
+# ~/.config/modelmux/config.toml (if running as non-root user)
+# Create config with: modelmux config init
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+# Logging (optional - systemd captures stdout/stderr by default)
+# StandardOutput=journal
+# StandardError=journal
+# SyslogIdentifier=modelmux
+
+# Security hardening (uncomment for production)
+# User=modelmux
+# Group=modelmux
+# NoNewPrivileges=true
+# PrivateTmp=true
+# ProtectSystem=strict
+# ReadWritePaths=/etc/modelmux
+
+[Install]
+WantedBy=multi-user.target

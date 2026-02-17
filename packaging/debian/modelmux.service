@@ -1,0 +1,16 @@
+# For .deb package - binary installed to /usr/bin/modelmux
+[Unit]
+Description=ModelMux - OpenAI-compatible proxy for Vertex AI
+Documentation=https://github.com/yarenty/modelmux
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/modelmux
+Restart=on-failure
+RestartSec=5
+Environment="PATH=/usr/bin:/bin"
+
+[Install]
+WantedBy=multi-user.target
