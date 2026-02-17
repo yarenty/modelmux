@@ -32,16 +32,15 @@ ModelMux is a production-ready, async Rust proxy that acts as a drop-in replacem
 It translates OpenAI-compatible requests into Google Vertex AI (Anthropic Claude) calls while preserving streaming, tool/function calling, and error semantics.
 Designed for performance, safety, and clean architecture, ModelMux is ideal for teams standardizing on OpenAI APIs while running on Vertex AI infrastructure.
 
-## 🎉 New in v0.6.0: Professional Configuration System
+## 🎉 New in v1.0.0: Production Ready
 
-ModelMux now features a professional, industry-standard configuration system:
+ModelMux v1.0.0 adds service management and Linux packaging:
 
+- **🍺 Brew services**: `brew services start modelmux` — run as a background service (macOS)
+- **🐧 systemd daemon**: Linux system and user service units — see `packaging/systemd/`
+- **📦 .deb packages**: Install on Ubuntu/Debian with `dpkg -i modelmux_*.deb`
 - **🏗️ Multi-layered configuration**: CLI args > env vars > user config > system config > defaults
-- **📁 Platform-native directories**: XDG-compliant paths on Linux, standard locations on macOS/Windows
-- **📝 TOML configuration**: Human-readable config files instead of complex environment variables
-- **🔒 Secure credential storage**: File-based service account storage with proper permissions
-- **⚙️ CLI management**: `modelmux config init`, `validate`, `show`, and `edit` commands
-- **🔄 Backward compatible**: Existing `.env` configurations continue to work
+- **📝 TOML configuration**: Human-readable config files; `modelmux config init` for quick setup
 
 **Quick setup**: `modelmux config init` creates your configuration interactively!
 
@@ -125,7 +124,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-modelmux = "0.6"
+modelmux = "1.0"
 ```
 
 ---
@@ -560,12 +559,11 @@ cargo run
 
 *See [ROADMAP.md](ROADMAP.md) for detailed future plans.*
 
-**✅ Completed in v0.6.0:**
+**✅ Completed in v1.0.0:**
+- ✅ Brew services and systemd daemon support
+- ✅ .deb packages for Ubuntu/Debian (amd64, arm64)
 - ✅ Professional configuration system with TOML files
-- ✅ Configuration validation tools (`modelmux config validate`)
 - ✅ CLI configuration management (`modelmux config init/show/edit`)
-- ✅ Platform-native configuration directories
-- ✅ Secure service account file handling
 
 **Near term:**
 - Docker container images

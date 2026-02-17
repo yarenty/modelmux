@@ -5,6 +5,29 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-02-17
+
+### Added
+
+#### Service Management
+- **Homebrew services**: Run as a background service with `brew services start modelmux` (macOS)
+- **systemd support**: Linux daemon with system and user service units
+  - `packaging/systemd/modelmux.service` — system-wide service
+  - `packaging/systemd/modelmux-user.service` — per-user service
+  - Documentation in `packaging/systemd/README.md`
+
+#### Linux / Ubuntu Packaging
+- **Debian packages (.deb)**: Build for amd64 and arm64 with `cargo-deb`
+- **systemd integration**: .deb packages include systemd unit and auto-enable on install
+- **Release workflow**: GitHub Actions builds .deb alongside binaries on tag push
+- **`packaging/release-linux.sh`**: Local .deb build script for testing
+
+### Changed
+
+- **Version**: 1.0.0 — production-ready milestone
+
+---
+
 ## [0.6.0] - 2026-02-14
 
 ### Added
@@ -281,12 +304,16 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
+- **1.0.0** (2026-02-17): Brew services, systemd daemon, .deb packaging, Linux release
+- **0.6.0** (2026-02-14): Professional configuration system, TOML, CLI management
 - **0.5.0** (2026-02-10): Provider abstraction, LLM_PROVIDER, Vertex/override config; legacy config removed
 - **0.3.1** (2026-02-10): Homebrew tap published; docs simplified
 - **0.3.0** (2026-02-10): Fixed doctor command, improved error messages, documentation cleanup
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.0.0]: https://github.com/yarenty/modelmux/compare/v0.6.0...v1.0.0
+[0.6.0]: https://github.com/yarenty/modelmux/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/yarenty/modelmux/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/yarenty/modelmux/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/yarenty/modelmux/compare/v0.2.0...v0.3.0
