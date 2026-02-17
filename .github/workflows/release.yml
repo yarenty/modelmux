@@ -15,7 +15,8 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             deb: true
-          - os: ubuntu-latest
+          # Native ARM build (aws-lc-sys fails when cross-compiling from x86)
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             deb: true
           - os: macos-latest
