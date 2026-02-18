@@ -1,0 +1,107 @@
+# ModelMux Configuration Example
+# Copy to /etc/modelmux/config.toml (system-wide) or ~/.config/modelmux/config.toml (user)
+# Then run: sudo systemctl enable --now modelmux (system) or systemctl --user enable --now modelmux (user)
+
+[server]
+# HTTP server port (default: 3000)
+port = 3000
+
+# Log level: trace, debug, info, warn, error (default: info)
+log_level = "info"
+
+# Enable automatic retries on transient failures (default: true)
+enable_retries = true
+
+# Maximum number of retry attempts (default: 3)
+max_retry_attempts = 3
+
+[auth]
+# Option 1: Path to Google Cloud service account JSON file
+# service_account_file = "/etc/modelmux/service-account.json"
+
+# Option 2: Inline service account JSON (recommended for containers/systemd)
+# Get your service account JSON from Google Cloud Console:
+# 1. Go to https://console.cloud.google.com/
+# 2. IAM & Admin → Service Accounts
+# 3. Create/select account with "Vertex AI User" role
+# 4. Download JSON key and paste here as a single line
+service_account_json = "{\"type\": \"service_account\", \"project_id\": \"your-project-id\", \"private_key_id\": \"key-id\", \"private_key\": \"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n\", \"client_email\": \"your-service-account@your-project.iam.gserviceaccount.com\", \"client_id\": \"123456789\", \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\", \"token_uri\": \"https://oauth2.googleapis.com/token\", \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\", \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/your-service-account%40your-project.iam.gserviceaccount.com\", \"universe_domain\": \"googleapis.com\"}"
+
+[streaming]
+# Streaming mode: auto (detect client), never, standard, buffered, always
+# auto = automatically detect client capabilities (recommended)
+mode = "auto"
+
+# Buffer size for streaming responses (default: 8192 bytes)
+buffer_size = 8192
+
+# Timeout for streaming chunks in milliseconds (default: 1000)
+chunk_timeout_ms = 1000
+
+[vertex]
+# Google Cloud project ID (required)
+project = "your-gcp-project-id"
+
+# Vertex AI region (required)
+# Common regions: us-central1, us-east1, europe-west1, europe-west4, asia-northeast1
+region = "us-central1"
+
+# Vertex AI location (usually same as region)
+location = "us-central1"
+
+# Model publisher (default: anthropic)
+# Available: anthropic, google, meta
+publisher = "anthropic"
+
+# Model ID (required)
+# Anthropic Claude models:
+#   claude-3-5-sonnet-20241022   # Latest Claude 3.5 Sonnet
+#   claude-3-5-haiku-20241022    # Latest Claude 3.5 Haiku
+#   claude-3-opus-20240229       # Claude 3 Opus
+#   claude-3-sonnet-20240229     # Claude 3 Sonnet
+#   claude-3-haiku-20240307      # Claude 3 Haiku
+model = "claude-3-5-sonnet-20241022"
+
+# Alternative: Full URL override (replaces all above vertex settings)
+# url = "https://us-central1-aiplatform.googleapis.com/v1/projects/your-project/locations/us-central1/publishers/anthropic/models/claude-3-5-sonnet-20241022"
+
+# ==============================================================================
+# SETUP INSTRUCTIONS
+# ==============================================================================
+#
+# 1. GOOGLE CLOUD SETUP:
+#    - Create a GCP project with billing enabled
+#    - Enable the Vertex AI API
+#    - Create a service account with "Vertex AI User" role
+#    - Download the service account JSON key
+#
+# 2. CONFIGURATION:
+#    - Copy this file to /etc/modelmux/config.toml
+#    - Edit the [vertex] section with your project details
+#    - Edit the [auth] section with your service account JSON
+#    - Adjust [server] and [streaming] settings as needed
+#
+# 3. INSTALLATION (choose one):
+#    a) System-wide (recommended):
+#       sudo cp config.toml /etc/modelmux/
+#       sudo chmod 644 /etc/modelmux/config.toml
+#       sudo systemctl enable --now modelmux
+#
+#    b) User-specific:
+#       mkdir -p ~/.config/modelmux
+#       cp config.toml ~/.config/modelmux/
+#       systemctl --user enable --now modelmux
+#
+# 4. VERIFICATION:
+#    modelmux doctor                    # Check configuration
+#    systemctl status modelmux          # Check service status
+#    curl -X POST http://localhost:3000/v1/chat/completions \
+#      -H "Content-Type: application/json" \
+#      -H "Authorization: Bearer dummy" \
+#      -d '{"model":"claude-3-5-sonnet-20241022","messages":[{"role":"user","content":"Hello!"}],"max_tokens":50}'
+#
+# 5. LOGS:
+#    journalctl -u modelmux -f          # Follow system logs
+#    journalctl --user -u modelmux -f   # Follow user logs
+#
+# For more information: https://github.com/yarenty/modelmux

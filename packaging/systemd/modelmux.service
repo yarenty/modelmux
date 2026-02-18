@@ -6,27 +6,36 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/modelmux
+ExecStart=/usr/bin/modelmux
 Restart=on-failure
 RestartSec=5
 
-# Configuration: uses /etc/modelmux/config.toml (system) or
-# ~/.config/modelmux/config.toml (if running as non-root user)
-# Create config with: modelmux config init
+# Configuration: reads from /etc/modelmux/config.toml (system) or
+# ~/.config/modelmux/config.toml (user config)
+# The config.toml file should contain:
+#   [server] - port, log_level, retries
+#   [auth] - service_account_json or service_account_file
+#   [vertex] - project, region, location, publisher, model
+#   [streaming] - mode, buffer_size, chunk_timeout_ms
+
+# Security hardening
+User=root
+Group=root
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ReadWritePaths=/etc/modelmux
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=modelmux
+
+# Performance
+LimitNOFILE=65536
+
+# Environment
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-
-# Logging (optional - systemd captures stdout/stderr by default)
-# StandardOutput=journal
-# StandardError=journal
-# SyslogIdentifier=modelmux
-
-# Security hardening (uncomment for production)
-# User=modelmux
-# Group=modelmux
-# NoNewPrivileges=true
-# PrivateTmp=true
-# ProtectSystem=strict
-# ReadWritePaths=/etc/modelmux
 
 [Install]
 WantedBy=multi-user.target
