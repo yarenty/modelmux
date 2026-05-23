@@ -327,6 +327,23 @@ Dual licensed under MIT OR Apache-2.0
   for the success path, idempotent no-op, no-clobber behaviour, and the
   empty-legacy case.
 
+#### Rotating log files
+- **Rotating log files** via `tracing-appender`. Logs go to stdout AND to a
+  daily-rotating file in the OS-conventional per-user log directory
+  (`~/Library/Logs/modelmux/` on macOS, `~/.local/state/modelmux/` on Linux
+  per XDG `$XDG_STATE_HOME`, `%LOCALAPPDATA%/modelmux/Logs/` on Windows),
+  keeping the last **30 files** (≈ last month). Fixes unbounded log growth
+  under `brew services` — the Homebrew formula no longer redirects stdout to
+  a single growing `var/log/modelmux.log`.
+
+  Cleanup for a pre-existing multi-GB log:
+
+  ```bash
+  brew services stop modelmux
+  rm -f "$(brew --prefix)"/var/log/modelmux.log*
+  brew services start modelmux
+  ```
+
 #### Legacy macOS Fallback in the Loader
 - `with_user_config` keeps a safety-net fallback that reads from the legacy
   macOS path if migration was skipped or failed. The fallback emits both a
@@ -375,7 +392,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
-- **1.1.0** (2026-05-23): macOS config moved to `~/.config/modelmux/` with automatic, idempotent migration
+- **1.1.0** (2026-05-23): macOS `~/.config/modelmux/` paths + auto-migration; rotating logs (~30 days retention)
 - **1.0.0** (2026-02-17): Brew services, systemd daemon, .deb packaging, Linux release
 - **0.6.0** (2026-02-14): Professional configuration system, TOML, CLI management
 - **0.5.0** (2026-02-10): Provider abstraction, LLM_PROVIDER, Vertex/override config; legacy config removed

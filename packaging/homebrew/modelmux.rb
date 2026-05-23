@@ -15,14 +15,15 @@ class Modelmux < Formula
 
   def install
     system "cargo", "install", *std_cargo_args
-    (var/"log").mkpath
   end
 
+  # ModelMux manages its own log files (daily rotation, 30-file retention
+  # ~= last month) under `~/Library/Logs/modelmux/` on macOS. We deliberately
+  # don't set `log_path` / `error_log_path` so brew services doesn't capture
+  # stdout/stderr into a single unbounded `var/log/modelmux.log`.
   service do
     run [opt_bin/"modelmux"]
     keep_alive true
-    log_path var/"log/modelmux.log"
-    error_log_path var/"log/modelmux.log"
   end
 
   def caveats
@@ -36,8 +37,12 @@ class Modelmux < Formula
       The service will use your config from:
         ~/.config/modelmux/config.toml (Linux & macOS)
 
-      Upgrading from <= 1.0.0 on macOS? Move your old config:
-        mv "$HOME/Library/Application Support/com.SkyCorp.modelmux"/* "$HOME/.config/modelmux/"
+      Logs (daily rotation, 30-file retention ~= last month):
+        ~/Library/Logs/modelmux/modelmux.log.YYYY-MM-DD
+
+      Upgrading from <= 1.0.0 on macOS? Just run `modelmux` once — config is
+      migrated automatically from ~/Library/Application Support/com.SkyCorp.modelmux/
+      to ~/.config/modelmux/ (idempotent).
     EOS
   end
 

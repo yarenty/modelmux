@@ -107,6 +107,23 @@ pub fn user_cache_dir() -> Result<PathBuf> {
     Ok(cache_dir)
 }
 
+/// Get the user log directory for ModelMux.
+///
+/// Uses the OS-conventional per-user log location so logs live alongside
+/// other application logs (and tools like `Console.app` on macOS can find
+/// them), separate from `user_data_dir`:
+/// - macOS: `~/Library/Logs/modelmux/` (Apple's `~/Library/Logs` convention)
+/// - Linux: `~/.local/state/modelmux/`   (XDG `$XDG_STATE_HOME`; the spec
+///   lists logs as a primary use case)
+/// - Windows: `%LOCALAPPDATA%/modelmux/Logs/`
+///
+/// Creates the directory if it doesn't exist.
+pub fn user_log_dir() -> Result<PathBuf> {
+    let dir = resolve_user_log_dir()?;
+    ensure_directory_exists(&dir)?;
+    Ok(dir)
+}
+
 /// Get the system configuration directory for ModelMux
 ///
 /// Returns the platform-appropriate system-wide configuration directory:
@@ -359,6 +376,30 @@ fn resolve_user_data_dir() -> Result<PathBuf> {
     #[cfg(not(target_os = "macos"))]
     {
         Ok(get_project_dirs()?.data_dir().to_path_buf())
+    }
+}
+
+/// Resolve the user log directory for the current platform.
+fn resolve_user_log_dir() -> Result<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        Ok(home_dir()?.join("Library").join("Logs").join(APP_NAME))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(state) = get_project_dirs()?.state_dir() {
+            Ok(state.to_path_buf())
+        } else {
+            Ok(home_dir()?.join(".local").join("state").join(APP_NAME))
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Ok(get_project_dirs()?.data_local_dir().join("Logs"))
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        Ok(home_dir()?.join(".local").join("state").join(APP_NAME))
     }
 }
 

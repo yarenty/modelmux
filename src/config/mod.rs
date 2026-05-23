@@ -503,6 +503,10 @@ enable_retries = true
 # Maximum number of retry attempts (default: 3)
 max_retry_attempts = 3
 
+# Logs are written to stdout AND to <user_data_dir>/logs/ with daily
+# rotation, keeping ~30 days (roughly the last month). No knobs here —
+# tracing-appender handles it.
+
 [auth]
 # Path to Google Cloud service account JSON file (recommended)
 # Supports tilde (~) expansion

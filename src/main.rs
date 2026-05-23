@@ -178,7 +178,9 @@ async fn main() {
 
 async fn run() -> Result<()> {
     let config = initialize_config()?;
-    initialize_logging(&config);
+    // Keep `_log_guard` alive until the end of `run()` so the rolling
+    // file writer can flush on shutdown.
+    let _log_guard = initialize_logging(&config);
 
     let app_state = create_app_state(config.clone()).await?;
     let app = create_router(app_state);
@@ -518,10 +520,47 @@ fn initialize_config() -> Result<Config> {
 ///
 /// # Arguments
 ///  * `config` - application configuration containing log level settings
-fn initialize_logging(config: &Config) {
+///
+/// Logs go to stdout AND to a daily-rotating file in the OS-conventional
+/// per-user log directory:
+/// - macOS: `~/Library/Logs/modelmux/`
+/// - Linux: `~/.local/state/modelmux/`
+/// - Windows: `%LOCALAPPDATA%/modelmux/Logs/`
+///
+/// The last 30 rotated files are kept (~ the last month) so logs never grow
+/// without bound. The returned guard must be kept alive for the lifetime of
+/// the process so the file appender can flush on shutdown.
+fn initialize_logging(config: &Config) -> Option<tracing_appender::non_blocking::WorkerGuard> {
+    use tracing_appender::rolling::{RollingFileAppender, Rotation};
+    use tracing_subscriber::fmt::writer::MakeWriterExt;
+
     let level = config.server.log_level.to_tracing_level();
 
-    tracing_subscriber::fmt().with_max_level(level).with_target(false).init();
+    let appender = crate::config::paths::user_log_dir().and_then(|dir| {
+        RollingFileAppender::builder()
+            .rotation(Rotation::DAILY)
+            .filename_prefix("modelmux.log")
+            .max_log_files(30)
+            .build(&dir)
+            .map_err(|e| crate::error::ProxyError::Config(format!("log appender: {}", e)))
+    });
+
+    match appender {
+        Ok(appender) => {
+            let (non_blocking, guard) = tracing_appender::non_blocking(appender);
+            tracing_subscriber::fmt()
+                .with_max_level(level)
+                .with_target(false)
+                .with_writer(non_blocking.and(std::io::stdout))
+                .init();
+            Some(guard)
+        }
+        Err(e) => {
+            eprintln!("[modelmux] file logging disabled: {}", e);
+            tracing_subscriber::fmt().with_max_level(level).with_target(false).init();
+            None
+        }
+    }
 }
 
 ///
