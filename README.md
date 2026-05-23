@@ -141,7 +141,7 @@ Use the interactive configuration wizard:
 modelmux config init
 ```
 
-Or create a configuration file manually. On macOS: `~/Library/Application Support/com.SkyCorp.modelmux/config.toml` (or `~/.config/modelmux/config.toml` on Linux):
+Or create a configuration file manually at `~/.config/modelmux/config.toml` (same path on Linux and macOS; Windows uses `%APPDATA%\modelmux\config.toml`):
 
 ```toml
 [server]
@@ -152,7 +152,7 @@ max_retry_attempts = 3
 
 [auth]
 # Path to Google Cloud service account JSON file
-service_account_file = "~/Library/Application Support/com.SkyCorp.modelmux/service-account.json"
+service_account_file = "~/.config/modelmux/service-account.json"
 # Or inline JSON for containers:
 # service_account_json = '{"type": "service_account", ...}'
 
@@ -221,8 +221,8 @@ Create `~/.config/modelmux/config.toml`:
 ```toml
 # ModelMux Configuration
 # Platform-specific locations:
-#   Linux: ~/.config/modelmux/config.toml
-#   macOS: ~/Library/Application Support/modelmux/config.toml  
+#   Linux:   ~/.config/modelmux/config.toml
+#   macOS:   ~/.config/modelmux/config.toml
 #   Windows: %APPDATA%/modelmux/config.toml
 
 [server]

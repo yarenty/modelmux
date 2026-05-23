@@ -2,7 +2,8 @@
 //! Professional configuration management for ModelMux.
 //!
 //! This module provides a clean, industry-standard configuration system using:
-//! - Platform-native configuration directories (XDG on Linux, standard paths on macOS/Windows)
+//! - Predictable configuration directories: XDG-style on both Linux and macOS
+//!   (`~/.config/modelmux/`), Known Folder layout on Windows
 //! - TOML format for human-readable configuration files
 //! - Multi-layered configuration hierarchy (CLI args > env vars > user config > defaults)
 //! - Secure service account file handling
@@ -321,8 +322,10 @@ impl Config {
     /// Load configuration from the standard hierarchy:
     /// 1. CLI arguments (highest priority)
     /// 2. Environment variables
-    /// 3. User config file (~/.config/modelmux/config.toml)
-    /// 4. System config file (/etc/modelmux/config.toml)
+    /// 3. User config file (`~/.config/modelmux/config.toml` on Linux/macOS,
+    ///    `%APPDATA%/modelmux/config.toml` on Windows)
+    /// 4. System config file (`/etc/modelmux/config.toml` on Unix,
+    ///    `%PROGRAMDATA%/modelmux/config.toml` on Windows)
     /// 5. Built-in defaults (lowest priority)
     ///
     /// # Returns
@@ -483,8 +486,8 @@ impl Config {
         r#"# ModelMux Configuration
 # This file should be placed at:
 #   Linux/Unix: ~/.config/modelmux/config.toml
-#   macOS: ~/Library/Application Support/modelmux/config.toml
-#   Windows: %APPDATA%/modelmux/config.toml
+#   macOS:      ~/.config/modelmux/config.toml
+#   Windows:    %APPDATA%/modelmux/config.toml
 
 [server]
 # HTTP server port (default: 3000)

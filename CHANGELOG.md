@@ -289,6 +289,35 @@ Dual licensed under MIT OR Apache-2.0
 
 ## [Unreleased]
 
+### Changed
+
+#### Configuration Paths (macOS)
+- **Predictable macOS config location**: ModelMux now stores its configuration
+  under `~/.config/modelmux/` on macOS (XDG-style), matching Linux instead of
+  hiding files inside `~/Library/Application Support/com.SkyCorp.modelmux/`.
+  - New defaults on macOS:
+    - Config: `~/.config/modelmux/config.toml`
+    - Service account: `~/.config/modelmux/service-account.json`
+    - Cache: `~/.cache/modelmux/`
+    - Data: `~/.local/share/modelmux/`
+  - System-wide config on macOS is now `/etc/modelmux/config.toml` (was
+    `/Library/Preferences/modelmux/`), for consistency with Linux.
+- Linux and Windows defaults are unchanged.
+
+### Migration (macOS users)
+
+ModelMux still reads the legacy macOS location and prints a one-time warning
+telling you to migrate. To move your existing config:
+
+```bash
+mkdir -p "$HOME/.config/modelmux"
+mv "$HOME/Library/Application Support/com.SkyCorp.modelmux"/* "$HOME/.config/modelmux/"
+rmdir "$HOME/Library/Application Support/com.SkyCorp.modelmux" 2>/dev/null || true
+```
+
+If you previously hand-wrote a `service_account_file` path in `config.toml`,
+update it to `~/.config/modelmux/service-account.json` as well.
+
 ### Planned Features
 
 - Docker container images

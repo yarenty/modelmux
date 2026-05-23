@@ -5,8 +5,10 @@
 //! industry best practices:
 //! 1. CLI arguments (highest priority)
 //! 2. Environment variables
-//! 3. User config file (~/.config/modelmux/config.toml)
-//! 4. System config file (/etc/modelmux/config.toml)
+//! 3. User config file (`~/.config/modelmux/config.toml` on Linux/macOS,
+//!    `%APPDATA%/modelmux/config.toml` on Windows)
+//! 4. System config file (`/etc/modelmux/config.toml` on Unix,
+//!    `%PROGRAMDATA%/modelmux/config.toml` on Windows)
 //! 5. Built-in defaults (lowest priority)
 //!
 //! Follows the Builder pattern (Open/Closed Principle) and Single Responsibility
@@ -86,9 +88,8 @@ impl ConfigLoader {
     /// Load system-wide configuration file
     ///
     /// Attempts to load configuration from the system config file:
-    /// - Linux: /etc/modelmux/config.toml
-    /// - macOS: /Library/Preferences/modelmux/config.toml
-    /// - Windows: %PROGRAMDATA%/modelmux/config.toml
+    /// - Linux/macOS: `/etc/modelmux/config.toml`
+    /// - Windows: `%PROGRAMDATA%/modelmux/config.toml`
     ///
     /// If the file doesn't exist, this is not considered an error.
     ///
@@ -111,11 +112,16 @@ impl ConfigLoader {
     /// Load user configuration file
     ///
     /// Attempts to load configuration from the user config file:
-    /// - Linux: ~/.config/modelmux/config.toml
-    /// - macOS: ~/Library/Application Support/modelmux/config.toml
-    /// - Windows: %APPDATA%/modelmux/config.toml
+    /// - Linux: `~/.config/modelmux/config.toml`
+    /// - macOS: `~/.config/modelmux/config.toml` (XDG-style)
+    /// - Windows: `%APPDATA%/modelmux/config.toml`
     ///
-    /// If the file doesn't exist, this is not considered an error.
+    /// On macOS the loader also checks legacy locations
+    /// (`~/Library/Application Support/com.SkyCorp.modelmux/config.toml` and
+    /// `~/Library/Application Support/modelmux/config.toml`) for backward
+    /// compatibility and emits a warning telling the user to migrate.
+    ///
+    /// If no config file is found, this is not considered an error.
     ///
     /// # Returns
     /// * `Ok(Self)` - User config loaded or skipped (file not found)
@@ -126,10 +132,50 @@ impl ConfigLoader {
         if user_config_path.exists() {
             tracing::debug!("Loading user config from: {}", user_config_path.display());
             self.load_config_file(&user_config_path)?;
-        } else {
-            tracing::debug!("User config not found at: {}", user_config_path.display());
+            return Ok(self);
         }
 
+        #[cfg(target_os = "macos")]
+        {
+            for legacy in paths::legacy_macos_user_config_files() {
+                if legacy.exists() {
+                    let new_dir = user_config_path
+                        .parent()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default();
+                    let legacy_dir =
+                        legacy.parent().map(|p| p.display().to_string()).unwrap_or_default();
+
+                    // tracing::warn! is captured by structured logging when
+                    // running as a server, but CLI subcommands run before
+                    // tracing is initialised — so we also print to stderr to
+                    // make sure the user always sees the migration notice.
+                    tracing::warn!(
+                        "Loading ModelMux config from legacy macOS location: {}. \
+                         New location is {}.",
+                        legacy.display(),
+                        user_config_path.display(),
+                    );
+                    eprintln!(
+                        "⚠️  ModelMux: loading config from legacy macOS location:\n     \
+                         {}\n   \
+                         ModelMux now stores configuration under ~/.config/modelmux/. To migrate:\n     \
+                         mkdir -p \"{}\"\n     \
+                         mv \"{}\"/* \"{}/\"\n     \
+                         rmdir \"{}\" 2>/dev/null || true",
+                        legacy.display(),
+                        new_dir,
+                        legacy_dir,
+                        new_dir,
+                        legacy_dir,
+                    );
+                    self.load_config_file(&legacy)?;
+                    return Ok(self);
+                }
+            }
+        }
+
+        tracing::debug!("User config not found at: {}", user_config_path.display());
         Ok(self)
     }
 

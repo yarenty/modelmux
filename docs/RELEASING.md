@@ -171,15 +171,15 @@ On `git push origin v*.*.*`, the release workflow:
 
 ```bash
 # Download .deb for your arch (amd64 or arm64)
-wget https://github.com/yarenty/modelmux/releases/download/v0.6.1/modelmux_0.6.1_amd64.deb
-sudo dpkg -i modelmux_0.6.1_amd64.deb
+wget https://github.com/yarenty/modelmux/releases/download/v1.0.0/modelmux_1.0.0_amd64.deb
+sudo dpkg -i modelmux_1.0.0_amd64.deb
 sudo systemctl enable --now modelmux
 ```
 
 **Option B: Download tarball**
 
 ```bash
-wget https://github.com/yarenty/modelmux/releases/download/v0.6.1/modelmux-x86_64-unknown-linux-gnu.tar.gz
+wget https://github.com/yarenty/modelmux/releases/download/v1.0.0/modelmux-x86_64-unknown-linux-gnu.tar.gz
 tar xzf modelmux-x86_64-unknown-linux-gnu.tar.gz
 sudo cp modelmux /usr/local/bin/
 # Then install systemd unit from packaging/systemd/ (see packaging/systemd/README.md)

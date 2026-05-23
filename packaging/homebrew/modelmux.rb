@@ -33,8 +33,10 @@ class Modelmux < Formula
         brew services start modelmux
 
       The service will use your config from:
-        ~/.config/modelmux/config.toml (Linux)
-        ~/Library/Application Support/modelmux/config.toml (macOS)
+        ~/.config/modelmux/config.toml (Linux & macOS)
+
+      Upgrading from <= 1.0.0 on macOS? Move your old config:
+        mv "$HOME/Library/Application Support/com.SkyCorp.modelmux"/* "$HOME/.config/modelmux/"
     EOS
   end
 

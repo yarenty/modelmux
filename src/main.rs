@@ -42,8 +42,7 @@
 //!
 //! 1. **Configuration File** (recommended):
 //! ```toml
-//! # ~/.config/modelmux/config.toml (Linux)
-//! # ~/Library/Application Support/modelmux/config.toml (macOS)
+//! # ~/.config/modelmux/config.toml (Linux & macOS)
 //! # %APPDATA%/modelmux/config.toml (Windows)
 //!
 //! [server]
