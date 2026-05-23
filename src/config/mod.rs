@@ -24,6 +24,7 @@
 
 pub mod cli;
 pub mod loader;
+pub mod migration;
 pub mod paths;
 pub mod validation;
 
@@ -343,6 +344,16 @@ impl Config {
     /// # }
     /// ```
     pub fn load() -> Result<Self> {
+        // Best-effort, idempotent platform migration before reading anything.
+        // Failures here are non-fatal — the loader has its own legacy
+        // fallback as a safety net, so we just surface a warning.
+        if let Err(e) = migration::migrate_legacy_macos_config() {
+            eprintln!(
+                "⚠️  ModelMux: macOS config migration failed (falling back to legacy lookup): {}",
+                e
+            );
+        }
+
         // First load using the new system for most settings
         let mut base_config = loader::ConfigLoader::new()
             .with_defaults()
