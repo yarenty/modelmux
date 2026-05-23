@@ -213,11 +213,10 @@ async fn process_chat_completion(
     headers: &HeaderMap,
 ) -> Result<axum::response::Response> {
     // Log User-Agent for debugging if present
-    if let Some(user_agent) = headers.get("user-agent") {
-        if let Ok(ua_str) = user_agent.to_str() {
+    if let Some(user_agent) = headers.get("user-agent")
+        && let Ok(ua_str) = user_agent.to_str() {
             tracing::debug!("Client User-Agent: {}", ua_str);
         }
-    }
 
     // Check for goose - it needs special handling
     let is_goose_client = detect_goose_client(headers);
@@ -680,22 +679,18 @@ fn determine_streaming_behavior(
 ///  * `true` if the client should use non-streaming responses
 fn detect_goose_client(headers: &HeaderMap) -> bool {
     // Check for goose using organization header (it doesn't send User-Agent)
-    if let Some(org) = headers.get("openai-organization") {
-        if let Ok(org_str) = org.to_str() {
-            if org_str.to_lowercase().contains("basebox") {
+    if let Some(org) = headers.get("openai-organization")
+        && let Ok(org_str) = org.to_str()
+            && org_str.to_lowercase().contains("basebox") {
                 return true;
             }
-        }
-    }
 
     // Check for goose using project header
-    if let Some(project) = headers.get("openai-project") {
-        if let Ok(project_str) = project.to_str() {
-            if project_str.to_lowercase().contains("gui") {
+    if let Some(project) = headers.get("openai-project")
+        && let Ok(project_str) = project.to_str()
+            && project_str.to_lowercase().contains("gui") {
                 return true;
             }
-        }
-    }
 
     false
 }
@@ -703,8 +698,8 @@ fn detect_goose_client(headers: &HeaderMap) -> bool {
 fn detect_problematic_client(headers: &HeaderMap) -> bool {
     // Keep only clients that truly can't handle SSE
 
-    if let Some(user_agent) = headers.get("user-agent") {
-        if let Ok(user_agent_str) = user_agent.to_str() {
+    if let Some(user_agent) = headers.get("user-agent")
+        && let Ok(user_agent_str) = user_agent.to_str() {
             let ua = user_agent_str.to_lowercase();
 
             // JetBrains IDEs moved to buffered streaming - they need SSE but with larger chunks
@@ -725,16 +720,13 @@ fn detect_problematic_client(headers: &HeaderMap) -> bool {
                 return true;
             }
         }
-    }
 
     // Check Accept header - clients that don't accept text/event-stream probably can't handle SSE
-    if let Some(accept) = headers.get("accept") {
-        if let Ok(accept_str) = accept.to_str() {
-            if !accept_str.contains("text/event-stream") && !accept_str.contains("*/*") {
+    if let Some(accept) = headers.get("accept")
+        && let Ok(accept_str) = accept.to_str()
+            && !accept_str.contains("text/event-stream") && !accept_str.contains("*/*") {
                 return true;
             }
-        }
-    }
 
     false
 }
@@ -751,8 +743,8 @@ fn detect_problematic_client(headers: &HeaderMap) -> bool {
 /// # Returns
 ///  * `true` if the client should use buffered streaming
 fn detect_buffered_streaming_client(headers: &HeaderMap) -> bool {
-    if let Some(user_agent) = headers.get("user-agent") {
-        if let Ok(user_agent_str) = user_agent.to_str() {
+    if let Some(user_agent) = headers.get("user-agent")
+        && let Ok(user_agent_str) = user_agent.to_str() {
             let ua = user_agent_str.to_lowercase();
 
             // Clients that can handle SSE but prefer larger chunks
@@ -773,7 +765,6 @@ fn detect_buffered_streaming_client(headers: &HeaderMap) -> bool {
                 return true;
             }
         }
-    }
 
     false
 }
@@ -836,17 +827,16 @@ async fn process_buffered_streaming_events(
     while let Some(chunk_result) = stream.next().await {
         match chunk_result {
             Ok(chunk) => {
-                if let Err(e) = process_buffered_stream_chunk(
-                    &chunk,
-                    &mut buffer,
-                    &state,
-                    &model,
-                    &mut current_tool_call,
-                    &mut has_tool_calls,
-                    &mut stop_reason_from_delta,
-                    &mut text_accumulator,
-                    &tx,
-                )
+                let mut ctx = BufferedStreamCtx {
+                    state: &state,
+                    model: &model,
+                    current_tool_call: &mut current_tool_call,
+                    has_tool_calls: &mut has_tool_calls,
+                    stop_reason_from_delta: &mut stop_reason_from_delta,
+                    text_accumulator: &mut text_accumulator,
+                    tx: &tx,
+                };
+                if let Err(e) = process_buffered_stream_chunk(&chunk, &mut buffer, &mut ctx)
                 .await
                 {
                     tracing::error!("Buffered stream processing error: {}", e);
@@ -868,6 +858,17 @@ async fn process_buffered_streaming_events(
     send_stream_done(&tx).await;
 }
 
+/// Mutable state shared by buffered streaming helpers.
+struct BufferedStreamCtx<'a> {
+    state: &'a Arc<AppState>,
+    model: &'a str,
+    current_tool_call: &'a mut Option<crate::converter::anthropic_to_openai::StreamingToolCall>,
+    has_tool_calls: &'a mut bool,
+    stop_reason_from_delta: &'a mut Option<String>,
+    text_accumulator: &'a mut String,
+    tx: &'a mpsc::Sender<Result<Event>>,
+}
+
 ///
 /// Process a single stream chunk with text buffering.
 ///
@@ -876,13 +877,7 @@ async fn process_buffered_streaming_events(
 async fn process_buffered_stream_chunk(
     chunk: &bytes::Bytes,
     buffer: &mut String,
-    state: &Arc<AppState>,
-    model: &str,
-    current_tool_call: &mut Option<crate::converter::anthropic_to_openai::StreamingToolCall>,
-    has_tool_calls: &mut bool,
-    stop_reason_from_delta: &mut Option<String>,
-    text_accumulator: &mut String,
-    tx: &mpsc::Sender<Result<Event>>,
+    ctx: &mut BufferedStreamCtx<'_>,
 ) -> Result<()> {
     let chunk_str = String::from_utf8_lossy(chunk);
     let new_content = format!("{}{}", buffer, chunk_str);
@@ -894,25 +889,15 @@ async fn process_buffered_stream_chunk(
         if let Some(data) = extract_sse_data(line) {
             if data == "[DONE]" {
                 // Send any remaining buffered text before DONE
-                if !text_accumulator.is_empty() {
-                    send_buffered_text(text_accumulator, model, state, tx).await;
-                    text_accumulator.clear();
+                if !ctx.text_accumulator.is_empty() {
+                    send_buffered_text(ctx.text_accumulator, ctx.model, ctx.state, ctx.tx).await;
+                    ctx.text_accumulator.clear();
                 }
-                send_sse_event(tx, "[DONE]").await;
+                send_sse_event(ctx.tx, "[DONE]").await;
                 continue;
             }
 
-            process_buffered_sse_event(
-                data,
-                state,
-                model,
-                current_tool_call,
-                has_tool_calls,
-                stop_reason_from_delta,
-                text_accumulator,
-                tx,
-            )
-            .await;
+            process_buffered_sse_event(data, ctx).await;
         }
     }
 
@@ -923,55 +908,48 @@ async fn process_buffered_stream_chunk(
 /// Process SSE event with text buffering logic.
 ///
 /// Accumulates text content and forwards other events immediately.
-async fn process_buffered_sse_event(
-    data: &str,
-    state: &Arc<AppState>,
-    model: &str,
-    current_tool_call: &mut Option<crate::converter::anthropic_to_openai::StreamingToolCall>,
-    has_tool_calls: &mut bool,
-    stop_reason_from_delta: &mut Option<String>,
-    text_accumulator: &mut String,
-    tx: &mpsc::Sender<Result<Event>>,
-) {
+async fn process_buffered_sse_event(data: &str, ctx: &mut BufferedStreamCtx<'_>) {
     match serde_json::from_str::<crate::converter::anthropic_to_openai::AnthropicStreamEvent>(data)
     {
         Ok(event) => {
-            if let Some(chunk) = state.anthropic_to_openai.convert_stream_event(
+            if let Some(chunk) = ctx.state.anthropic_to_openai.convert_stream_event(
                 &event,
-                model,
-                current_tool_call,
-                has_tool_calls,
-                stop_reason_from_delta,
+                ctx.model,
+                ctx.current_tool_call,
+                ctx.has_tool_calls,
+                ctx.stop_reason_from_delta,
             ) {
                 // Check if this is a text chunk that should be buffered
                 if let Some(content) =
-                    chunk.choices.get(0).and_then(|choice| choice.delta.content.as_ref())
+                    chunk.choices.first().and_then(|choice| choice.delta.content.as_ref())
                 {
                     // Accumulate text content
-                    text_accumulator.push_str(content);
+                    ctx.text_accumulator.push_str(content);
 
                     // Send buffered text if it's large enough or if we hit certain punctuation
-                    if text_accumulator.len() >= MIN_BUFFER_SIZE
+                    if ctx.text_accumulator.len() >= MIN_BUFFER_SIZE
                         || content.contains('.')
                         || content.contains('!')
                         || content.contains('?')
                         || content.contains('\n')
                     {
-                        send_buffered_text(text_accumulator, model, state, tx).await;
-                        text_accumulator.clear();
+                        send_buffered_text(ctx.text_accumulator, ctx.model, ctx.state, ctx.tx)
+                            .await;
+                        ctx.text_accumulator.clear();
                     }
                 } else {
                     // Non-text chunks (tool calls, finish_reason, etc.) are sent immediately
                     // But first flush any accumulated text
-                    if !text_accumulator.is_empty() {
-                        send_buffered_text(text_accumulator, model, state, tx).await;
-                        text_accumulator.clear();
+                    if !ctx.text_accumulator.is_empty() {
+                        send_buffered_text(ctx.text_accumulator, ctx.model, ctx.state, ctx.tx)
+                            .await;
+                        ctx.text_accumulator.clear();
                     }
 
                     // Send the non-text chunk
                     match serde_json::to_string(&chunk) {
                         Ok(json) => {
-                            send_sse_event(tx, &json).await;
+                            send_sse_event(ctx.tx, &json).await;
                         }
                         Err(e) => {
                             tracing::error!("Failed to serialize chunk: {}", e);
@@ -1472,7 +1450,7 @@ mod tests {
         let vertex = VertexProvider {
             predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
             display_model: "test".to_string(),
-            auth: AuthStrategy::GcpOAuth2(service_account_key),
+            auth: AuthStrategy::GcpOAuth2(Box::new(service_account_key)),
         };
         let config = Config {
             server: ServerConfig {
@@ -1537,7 +1515,7 @@ mod tests {
         let vertex = VertexProvider {
             predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
             display_model: "test".to_string(),
-            auth: AuthStrategy::GcpOAuth2(service_account_key),
+            auth: AuthStrategy::GcpOAuth2(Box::new(service_account_key)),
         };
         let config = Config {
             server: ServerConfig {

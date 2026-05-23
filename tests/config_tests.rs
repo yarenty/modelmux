@@ -230,7 +230,7 @@ fn test_retry_config() {
         ],
         || {
             let config = Config::load().expect("Should load config");
-            assert_eq!(config.server.enable_retries, false, "Should parse enable_retries");
+            assert!(!config.server.enable_retries, "Should parse enable_retries");
             assert_eq!(config.server.max_retry_attempts, 5, "Should parse max_retry_attempts");
         },
     );
@@ -251,7 +251,7 @@ fn test_default_retry_config() {
         ],
         || {
             let config = Config::load().expect("Should load config");
-            assert_eq!(config.server.enable_retries, true, "Default enable_retries should be true");
+            assert!(config.server.enable_retries, "Default enable_retries should be true");
             assert_eq!(
                 config.server.max_retry_attempts, 3,
                 "Default max_retry_attempts should be 3"
@@ -282,25 +282,25 @@ fn test_config_fails_without_auth() {
 /// Test StreamingMode::from_str function
 #[test]
 fn test_streaming_mode_from_str() {
-    assert_eq!(StreamingMode::from_str("auto").unwrap(), StreamingMode::Auto);
-    assert_eq!(StreamingMode::from_str("AUTO").unwrap(), StreamingMode::Auto); // Case insensitive
-    assert_eq!(StreamingMode::from_str("never").unwrap(), StreamingMode::Never);
-    assert_eq!(StreamingMode::from_str("standard").unwrap(), StreamingMode::Standard);
-    assert_eq!(StreamingMode::from_str("buffered").unwrap(), StreamingMode::Buffered);
-    assert_eq!(StreamingMode::from_str("always").unwrap(), StreamingMode::Always);
-    assert!(StreamingMode::from_str("unknown").is_err()); // Should fail for invalid input
+    assert_eq!("auto".parse::<StreamingMode>().unwrap(), StreamingMode::Auto);
+    assert_eq!("AUTO".parse::<StreamingMode>().unwrap(), StreamingMode::Auto); // Case insensitive
+    assert_eq!("never".parse::<StreamingMode>().unwrap(), StreamingMode::Never);
+    assert_eq!("standard".parse::<StreamingMode>().unwrap(), StreamingMode::Standard);
+    assert_eq!("buffered".parse::<StreamingMode>().unwrap(), StreamingMode::Buffered);
+    assert_eq!("always".parse::<StreamingMode>().unwrap(), StreamingMode::Always);
+    assert!("unknown".parse::<StreamingMode>().is_err()); // Should fail for invalid input
 }
 
 /// Test LogLevel::from_str function
 #[test]
 fn test_log_level_from_str() {
-    assert_eq!(LogLevel::from_str("trace").unwrap(), LogLevel::Trace);
-    assert_eq!(LogLevel::from_str("TRACE").unwrap(), LogLevel::Trace); // Case insensitive
-    assert_eq!(LogLevel::from_str("debug").unwrap(), LogLevel::Debug);
-    assert_eq!(LogLevel::from_str("info").unwrap(), LogLevel::Info);
-    assert_eq!(LogLevel::from_str("warn").unwrap(), LogLevel::Warn);
-    assert_eq!(LogLevel::from_str("error").unwrap(), LogLevel::Error);
-    assert!(LogLevel::from_str("unknown").is_err()); // Should fail for invalid input
+    assert_eq!("trace".parse::<LogLevel>().unwrap(), LogLevel::Trace);
+    assert_eq!("TRACE".parse::<LogLevel>().unwrap(), LogLevel::Trace); // Case insensitive
+    assert_eq!("debug".parse::<LogLevel>().unwrap(), LogLevel::Debug);
+    assert_eq!("info".parse::<LogLevel>().unwrap(), LogLevel::Info);
+    assert_eq!("warn".parse::<LogLevel>().unwrap(), LogLevel::Warn);
+    assert_eq!("error".parse::<LogLevel>().unwrap(), LogLevel::Error);
+    assert!("unknown".parse::<LogLevel>().is_err()); // Should fail for invalid input
 }
 
 /// Test build_predict_url functionality

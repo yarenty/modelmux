@@ -281,7 +281,7 @@ impl<'a> ConfigValidator<'a> {
         ];
 
         for field in &required_fields {
-            if !service_account.get(field).and_then(|v| v.as_str()).map_or(false, |s| !s.is_empty())
+            if service_account.get(field).and_then(|v| v.as_str()).is_none_or(|s| s.is_empty())
             {
                 self.add_error(format!(
                     "Service account JSON missing or empty required field: '{}'",
@@ -291,29 +291,26 @@ impl<'a> ConfigValidator<'a> {
         }
 
         // Validate specific field formats
-        if let Some(account_type) = service_account.get("type").and_then(|v| v.as_str()) {
-            if account_type != "service_account" {
+        if let Some(account_type) = service_account.get("type").and_then(|v| v.as_str())
+            && account_type != "service_account" {
                 self.add_error(format!(
                     "Invalid service account type: '{}'. Expected 'service_account'",
                     account_type
                 ));
             }
-        }
 
-        if let Some(client_email) = service_account.get("client_email").and_then(|v| v.as_str()) {
-            if !client_email.contains('@') || !client_email.contains("gserviceaccount.com") {
+        if let Some(client_email) = service_account.get("client_email").and_then(|v| v.as_str())
+            && (!client_email.contains('@') || !client_email.contains("gserviceaccount.com")) {
                 self.add_warning(format!(
                     "Service account email '{}' doesn't look like a Google service account email",
                     client_email
                 ));
             }
-        }
 
-        if let Some(private_key) = service_account.get("private_key").and_then(|v| v.as_str()) {
-            if !private_key.starts_with("-----BEGIN PRIVATE KEY-----") {
+        if let Some(private_key) = service_account.get("private_key").and_then(|v| v.as_str())
+            && !private_key.starts_with("-----BEGIN PRIVATE KEY-----") {
                 self.add_error("Private key doesn't appear to be in valid PEM format".to_string());
             }
-        }
     }
 
     /// Validate file permissions for security
@@ -396,21 +393,19 @@ impl<'a> ConfigValidator<'a> {
 
         // Mode-specific validations
         match streaming.mode {
-            StreamingMode::Never => {
-                if streaming.buffer_size > 1024 * 1024 {
+            StreamingMode::Never
+                if streaming.buffer_size > 1024 * 1024 => {
                     self.add_warning(
                         "Large buffer size not needed when streaming is disabled".to_string(),
                     );
                 }
-            }
-            StreamingMode::Buffered => {
-                if streaming.buffer_size < 4096 {
+            StreamingMode::Buffered
+                if streaming.buffer_size < 4096 => {
                     self.add_warning(
                         "Small buffer size may reduce effectiveness of buffered streaming"
                             .to_string(),
                     );
                 }
-            }
             _ => {} // Other modes are fine
         }
 

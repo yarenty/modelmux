@@ -65,7 +65,7 @@ fn create_test_config() -> Config {
     let vertex = VertexProvider {
         predict_resource_url: "https://test.example.com/v1/test-model".to_string(),
         display_model: "test-model".to_string(),
-        auth: AuthStrategy::GcpOAuth2(service_account_key),
+        auth: AuthStrategy::GcpOAuth2(Box::new(service_account_key)),
     };
     Config {
         server: modelmux::config::ServerConfig {

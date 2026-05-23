@@ -25,7 +25,7 @@ use crate::error::{ProxyError, Result};
 #[derive(Debug, Clone)]
 pub enum AuthStrategy {
     /// Google Cloud OAuth2 with service account (Vertex AI).
-    GcpOAuth2(ServiceAccountKey),
+    GcpOAuth2(Box<ServiceAccountKey>),
     /// Static Bearer token (e.g. from OPENAI_API_KEY, MISTRAL_API_KEY).
     #[allow(dead_code)]
     BearerToken(String),
@@ -80,7 +80,7 @@ impl VertexProvider {
     pub fn from_env() -> Result<Self> {
         let service_account_key = Self::load_service_account_key()?;
         let (predict_resource_url, display_model) = Self::resolve_predict_url_and_model(None)?;
-        let auth = AuthStrategy::GcpOAuth2(service_account_key);
+        let auth = AuthStrategy::GcpOAuth2(Box::new(service_account_key));
 
         Ok(Self { predict_resource_url, display_model, auth })
     }
@@ -105,7 +105,7 @@ impl VertexProvider {
     ) -> Result<Self> {
         let (predict_resource_url, display_model) =
             Self::resolve_predict_url_and_model(vertex_config)?;
-        let auth = AuthStrategy::GcpOAuth2(service_account_key);
+        let auth = AuthStrategy::GcpOAuth2(Box::new(service_account_key));
 
         Ok(Self { predict_resource_url, display_model, auth })
     }
@@ -117,33 +117,29 @@ impl VertexProvider {
 
     fn resolve_predict_url_and_model(vertex_config: Option<&VertexConfig>) -> Result<(String, String)> {
         // 1. Check config file URL override
-        if let Some(cfg) = vertex_config {
-            if let Some(ref url) = cfg.url {
-                if !url.trim().is_empty() {
+        if let Some(cfg) = vertex_config
+            && let Some(ref url) = cfg.url
+                && !url.trim().is_empty() {
                     let resource_url = Self::strip_predict_method_suffix(url.trim());
                     let display = Self::get_model_display_name_from_config_or_env(cfg)?;
                     return Ok((resource_url, display));
                 }
-            }
-        }
 
         // 2. Check env var LLM_URL
-        if let Ok(url) = env::var("LLM_URL") {
-            if !url.trim().is_empty() {
+        if let Ok(url) = env::var("LLM_URL")
+            && !url.trim().is_empty() {
                 let resource_url = Self::strip_predict_method_suffix(url.trim());
                 let display = Self::get_model_display_name_override()?;
                 return Ok((resource_url, display));
             }
-        }
 
         // 3. Check config file vertex fields
-        if let Some(cfg) = vertex_config {
-            if Self::has_vertex_config(cfg) {
+        if let Some(cfg) = vertex_config
+            && Self::has_vertex_config(cfg) {
                 let resource_url = Self::build_vertex_resource_url_from_config(cfg)?;
                 let display = Self::get_model_display_name_from_config_or_env(cfg)?;
                 return Ok((resource_url, display));
             }
-        }
 
         // 4. Check env vars
         if Self::has_vertex_vars() {
@@ -255,16 +251,14 @@ impl VertexProvider {
     }
 
     fn get_model_display_name_override() -> Result<String> {
-        if let Ok(name) = env::var("LLM_MODEL_DISPLAY_NAME") {
-            if !name.trim().is_empty() {
+        if let Ok(name) = env::var("LLM_MODEL_DISPLAY_NAME")
+            && !name.trim().is_empty() {
                 return Ok(name.trim().to_string());
             }
-        }
-        if let Ok(name) = env::var("LLM_MODEL") {
-            if !name.trim().is_empty() {
+        if let Ok(name) = env::var("LLM_MODEL")
+            && !name.trim().is_empty() {
                 return Ok(name.trim().to_string());
             }
-        }
         if let Ok(url) = env::var("LLM_URL") {
             let segment = url.trim().rsplit('/').next().unwrap_or("");
             let display = segment.split('@').next().unwrap_or(segment).to_string();
@@ -276,16 +270,14 @@ impl VertexProvider {
     }
 
     fn get_model_display_name_vertex() -> Result<String> {
-        if let Ok(name) = env::var("LLM_MODEL_DISPLAY_NAME") {
-            if !name.trim().is_empty() {
+        if let Ok(name) = env::var("LLM_MODEL_DISPLAY_NAME")
+            && !name.trim().is_empty() {
                 return Ok(name.trim().to_string());
             }
-        }
-        if let Ok(name) = env::var("LLM_MODEL") {
-            if !name.trim().is_empty() {
+        if let Ok(name) = env::var("LLM_MODEL")
+            && !name.trim().is_empty() {
                 return Ok(name.trim().to_string());
             }
-        }
         if let Ok(id) = env::var("VERTEX_MODEL_ID") {
             let display = id.trim().split('@').next().unwrap_or(id.trim()).to_string();
             if !display.is_empty() {
@@ -299,16 +291,14 @@ impl VertexProvider {
     }
 
     fn get_model_display_name_from_config_or_env(cfg: &VertexConfig) -> Result<String> {
-        if let Ok(name) = env::var("LLM_MODEL_DISPLAY_NAME") {
-            if !name.trim().is_empty() {
+        if let Ok(name) = env::var("LLM_MODEL_DISPLAY_NAME")
+            && !name.trim().is_empty() {
                 return Ok(name.trim().to_string());
             }
-        }
-        if let Ok(name) = env::var("LLM_MODEL") {
-            if !name.trim().is_empty() {
+        if let Ok(name) = env::var("LLM_MODEL")
+            && !name.trim().is_empty() {
                 return Ok(name.trim().to_string());
             }
-        }
         if let Some(ref id) = cfg.model {
             let display = id.trim().split('@').next().unwrap_or(id.trim()).to_string();
             if !display.is_empty() {

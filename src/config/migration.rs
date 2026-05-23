@@ -243,8 +243,7 @@ fn rewrite_legacy_paths_in_config(config_file: &Path, new_dir: &Path) -> Result<
         // Walk every occurrence of the needle, then back up to the start of
         // the absolute path (the nearest `/`) and forward to the end of the
         // legacy directory portion. Replace that whole span with `new_dir`.
-        loop {
-            let Some(idx) = updated.find(needle) else { break };
+        while let Some(idx) = updated.find(needle) {
             // Find the start of the absolute path containing this needle.
             let start = updated[..idx].rfind('/').map(|p| {
                 // Walk back further while we keep seeing path chars (so
@@ -369,7 +368,8 @@ mod tests {
         );
         write(&legacy_sa, "{\"type\":\"service_account\"}");
 
-        let outcome = migrate_inner(&[legacy.clone()], &new_dir).expect("migration succeeds");
+        let outcome = migrate_inner(std::slice::from_ref(&legacy), &new_dir)
+            .expect("migration succeeds");
 
         assert_eq!(outcome.moved.len(), 2, "should move config.toml and service-account.json");
         assert!(outcome.rewrote_paths, "should rewrite the absolute legacy path");
@@ -405,7 +405,8 @@ mod tests {
         write(&legacy.join("config.toml"), "[server]\nport = 1\n");
         write(&new_dir.join("config.toml"), "[server]\nport = 2\n");
 
-        let outcome = migrate_inner(&[legacy.clone()], &new_dir).expect("idempotent run");
+        let outcome = migrate_inner(std::slice::from_ref(&legacy), &new_dir)
+            .expect("idempotent run");
 
         assert!(outcome.moved.is_empty(), "must not move anything when new config exists");
         assert!(!outcome.rewrote_paths);
@@ -430,7 +431,8 @@ mod tests {
         write(&legacy.join("service-account.json"), "{\"legacy\":true}");
         write(&new_dir.join("service-account.json"), "{\"new\":true}");
 
-        let outcome = migrate_inner(&[legacy.clone()], &new_dir).expect("migration succeeds");
+        let outcome = migrate_inner(std::slice::from_ref(&legacy), &new_dir)
+            .expect("migration succeeds");
 
         assert_eq!(outcome.moved.len(), 1, "only config.toml should be moved");
         assert_eq!(outcome.skipped_existing.len(), 1);

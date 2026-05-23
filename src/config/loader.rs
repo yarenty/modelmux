@@ -22,7 +22,7 @@
 /* --- uses ------------------------------------------------------------------------------------ */
 
 use crate::config::paths;
-use crate::config::{AuthConfig, Config, LogLevel, ServerConfig, StreamingConfig, StreamingMode};
+use crate::config::{AuthConfig, Config, ServerConfig, StreamingConfig};
 use crate::error::{ProxyError, Result};
 
 use std::collections::HashMap;
@@ -410,7 +410,7 @@ impl ConfigLoader {
                     })?;
                 }
                 "MODELMUX_SERVER_LOG_LEVEL" => {
-                    self.config.server.log_level = LogLevel::from_str(value)?;
+                    self.config.server.log_level = value.parse()?;
                 }
                 "MODELMUX_SERVER_ENABLE_RETRIES" => {
                     self.config.server.enable_retries = parse_bool_env(value, key)?;
@@ -434,7 +434,7 @@ impl ConfigLoader {
 
                 // Streaming configuration
                 "MODELMUX_STREAMING_MODE" => {
-                    self.config.streaming.mode = StreamingMode::from_str(value)?;
+                    self.config.streaming.mode = value.parse()?;
                 }
                 "MODELMUX_STREAMING_BUFFER_SIZE" => {
                     self.config.streaming.buffer_size = value.parse().map_err(|e| {
@@ -513,6 +513,7 @@ fn parse_bool_env(value: &str, var_name: &str) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{LogLevel, StreamingMode};
     use std::fs;
     use tempfile::TempDir;
 

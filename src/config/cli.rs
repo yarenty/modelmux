@@ -564,7 +564,7 @@ impl ConfigCli {
                 return Ok(default);
             }
 
-            match LogLevel::from_str(input) {
+            match input.parse::<LogLevel>() {
                 Ok(level) => return Ok(level),
                 Err(_) => {
                     println!("Invalid log level. Valid options: trace, debug, info, warn, error");
@@ -589,7 +589,7 @@ impl ConfigCli {
                 return Ok(default);
             }
 
-            match StreamingMode::from_str(input) {
+            match input.parse::<StreamingMode>() {
                 Ok(mode) => return Ok(mode),
                 Err(_) => {
                     println!(

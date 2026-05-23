@@ -33,6 +33,7 @@ pub mod validation;
 use crate::error::{ProxyError, Result};
 use crate::provider::{AuthStrategy, LlmProviderBackend, LlmProviderConfig};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /* --- types ----------------------------------------------------------------------------------- */
 
@@ -42,6 +43,7 @@ use serde::{Deserialize, Serialize};
 /// This replaces the old Config struct with TOML-compatible fields
 /// and better organization following configuration best practices.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct Config {
     /// HTTP server configuration
     pub server: ServerConfig,
@@ -255,7 +257,7 @@ pub fn default_auth_strategy() -> AuthStrategy {
         client_x509_cert_url: "".to_string(),
         universe_domain: None,
     };
-    AuthStrategy::GcpOAuth2(placeholder_key)
+    AuthStrategy::GcpOAuth2(Box::new(placeholder_key))
 }
 
 /// Default streaming mode
@@ -275,18 +277,6 @@ fn default_chunk_timeout() -> u64 {
 
 /* --- implementations --------------------------------------------------------------------- */
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            auth: AuthConfig::default(),
-            streaming: StreamingConfig::default(),
-            vertex: None,
-            // Provider will be loaded separately
-            llm_provider: None,
-        }
-    }
-}
 
 impl Default for ServerConfig {
     fn default() -> Self {
@@ -559,7 +549,7 @@ model = "claude-3-5-sonnet@20241022"
 
 impl LogLevel {
     /// Convert to tracing::Level for logging setup
-    pub fn to_tracing_level(&self) -> tracing::Level {
+    pub fn to_tracing_level(self) -> tracing::Level {
         match self {
             LogLevel::Trace => tracing::Level::TRACE,
             LogLevel::Debug => tracing::Level::DEBUG,
@@ -574,8 +564,13 @@ impl LogLevel {
         matches!(self, LogLevel::Trace | LogLevel::Debug)
     }
 
-    /// Parse from string (case-insensitive)
-    pub fn from_str(s: &str) -> Result<Self> {
+}
+
+impl FromStr for LogLevel {
+    type Err = ProxyError;
+
+    /// Parse from string (case-insensitive).
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "trace" => Ok(LogLevel::Trace),
             "debug" => Ok(LogLevel::Debug),
@@ -590,9 +585,11 @@ impl LogLevel {
     }
 }
 
-impl StreamingMode {
-    /// Parse from string (case-insensitive)
-    pub fn from_str(s: &str) -> Result<Self> {
+impl FromStr for StreamingMode {
+    type Err = ProxyError;
+
+    /// Parse from string (case-insensitive).
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "auto" => Ok(StreamingMode::Auto),
             "never" | "false" | "no" => Ok(StreamingMode::Never),
@@ -605,6 +602,9 @@ impl StreamingMode {
             ))),
         }
     }
+}
+
+impl StreamingMode {
 
     /// Check if this mode supports streaming
     #[allow(dead_code)]

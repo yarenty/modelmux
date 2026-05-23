@@ -518,7 +518,6 @@ fn initialize_config() -> Result<Config> {
 ///
 /// # Arguments
 ///  * `config` - application configuration containing log level settings
-/// Initialize logging based on configuration settings.
 fn initialize_logging(config: &Config) {
     let level = config.server.log_level.to_tracing_level();
 

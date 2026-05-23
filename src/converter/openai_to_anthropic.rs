@@ -783,11 +783,10 @@ impl OpenAiToAnthropicConverter {
             }
             Some(OpenAiContent::Array(blocks)) => {
                 for block in blocks {
-                    if block.block_type == "text" {
-                        if let Some(text) = &block.text {
+                    if block.block_type == "text"
+                        && let Some(text) = &block.text {
                             content.push(AnthropicContentBlock::Text { text: text.clone() });
                         }
-                    }
                 }
             }
             _ => {}

@@ -18,7 +18,7 @@ fn get_binary_command() -> Command {
         Command::new("target/release/modelmux")
     } else {
         let mut cmd = Command::new("cargo");
-        cmd.args(&["run", "--bin", "modelmux", "--"]);
+        cmd.args(["run", "--bin", "modelmux", "--"]);
         cmd
     }
 }

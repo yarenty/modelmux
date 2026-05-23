@@ -234,9 +234,9 @@ pub fn expand_path<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
     let path_str = path.as_ref().to_string_lossy();
 
     // Handle tilde expansion
-    if path_str.starts_with("~/") {
+    if let Some(rest) = path_str.strip_prefix("~/") {
         if let Some(dirs) = directories::UserDirs::new() {
-            let expanded = dirs.home_dir().join(&path_str[2..]);
+            let expanded = dirs.home_dir().join(rest);
             return Ok(expanded);
         } else {
             return Err(ProxyError::Config(
