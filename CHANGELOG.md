@@ -287,27 +287,68 @@ Dual licensed under MIT OR Apache-2.0
 
 ---
 
-## [Unreleased]
+## [1.1.0] - 2026-05-23
 
 ### Changed
 
-#### Configuration Paths (macOS)
-- **Predictable macOS config location**: ModelMux now stores its configuration
-  under `~/.config/modelmux/` on macOS (XDG-style), matching Linux instead of
-  hiding files inside `~/Library/Application Support/com.SkyCorp.modelmux/`.
-  - New defaults on macOS:
-    - Config: `~/.config/modelmux/config.toml`
-    - Service account: `~/.config/modelmux/service-account.json`
-    - Cache: `~/.cache/modelmux/`
-    - Data: `~/.local/share/modelmux/`
-  - System-wide config on macOS is now `/etc/modelmux/config.toml` (was
-    `/Library/Preferences/modelmux/`), for consistency with Linux.
+#### Predictable macOS Configuration Paths
+- **`~/.config/modelmux/` on macOS too**: ModelMux now stores its configuration
+  under `~/.config/modelmux/` on macOS (XDG-style), matching Linux. No more
+  hunting through `~/Library/Application Support/com.SkyCorp.modelmux/`.
+- **New defaults on macOS**:
+  - Config: `~/.config/modelmux/config.toml`
+  - Service account: `~/.config/modelmux/service-account.json`
+  - Cache: `~/.cache/modelmux/`
+  - Data: `~/.local/share/modelmux/`
+- **System-wide config on macOS** moved from `/Library/Preferences/modelmux/`
+  to `/etc/modelmux/`, for consistency with Linux.
 - Linux and Windows defaults are unchanged.
 
-### Migration (macOS users)
+### Added
 
-ModelMux still reads the legacy macOS location and prints a one-time warning
-telling you to migrate. To move your existing config:
+#### Automatic, Idempotent macOS Config Migration
+- On startup, ModelMux now auto-migrates any existing configuration from the
+  legacy `~/Library/Application Support/com.SkyCorp.modelmux/` (or
+  `…/modelmux/`) into `~/.config/modelmux/`:
+  - **Idempotent**: short-circuits once `~/.config/modelmux/config.toml`
+    exists; safe to call on every startup.
+  - **Non-destructive**: never overwrites a file that already exists in the
+    new location. Conflicting files stay at the legacy path and the user is
+    told about them once.
+  - **Path-aware**: rewrites absolute references to the legacy directory
+    inside `config.toml` (e.g. `service_account_file = ".../Library/Application
+    Support/com.SkyCorp.modelmux/service-account.json"`) so configs keep
+    working without manual editing.
+  - **Best-effort cleanup**: empties and removes the legacy directory once
+    everything has been moved.
+- The migration prints a single, clear stderr report on the run that performs
+  the move and is silent on every subsequent run.
+- Implementation lives in `src/config/migration.rs`, covered by unit tests
+  for the success path, idempotent no-op, no-clobber behaviour, and the
+  empty-legacy case.
+
+#### Legacy macOS Fallback in the Loader
+- `with_user_config` keeps a safety-net fallback that reads from the legacy
+  macOS path if migration was skipped or failed. The fallback emits both a
+  `tracing::warn!` and an `eprintln!` migration hint so users see the message
+  even during CLI subcommands (which run before logging is initialised).
+
+### Migration
+
+No manual steps required for most users — just upgrade and run `modelmux`.
+The first run on macOS will print:
+
+```
+✅ ModelMux: migrated configuration to XDG-style macOS location
+   New location: /Users/you/.config/modelmux
+   Migrated from: /Users/you/Library/Application Support/com.SkyCorp.modelmux
+   Moved files:
+     - config.toml
+     - service-account.json
+   Rewrote absolute paths in config.toml to point at the new location.
+```
+
+If you'd rather migrate by hand:
 
 ```bash
 mkdir -p "$HOME/.config/modelmux"
@@ -315,8 +356,9 @@ mv "$HOME/Library/Application Support/com.SkyCorp.modelmux"/* "$HOME/.config/mod
 rmdir "$HOME/Library/Application Support/com.SkyCorp.modelmux" 2>/dev/null || true
 ```
 
-If you previously hand-wrote a `service_account_file` path in `config.toml`,
-update it to `~/.config/modelmux/service-account.json` as well.
+---
+
+## [Unreleased]
 
 ### Planned Features
 
@@ -333,6 +375,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
+- **1.1.0** (2026-05-23): macOS config moved to `~/.config/modelmux/` with automatic, idempotent migration
 - **1.0.0** (2026-02-17): Brew services, systemd daemon, .deb packaging, Linux release
 - **0.6.0** (2026-02-14): Professional configuration system, TOML, CLI management
 - **0.5.0** (2026-02-10): Provider abstraction, LLM_PROVIDER, Vertex/override config; legacy config removed
@@ -341,6 +384,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.1.0]: https://github.com/yarenty/modelmux/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/yarenty/modelmux/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/yarenty/modelmux/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/yarenty/modelmux/compare/v0.3.1...v0.5.0
