@@ -13,6 +13,7 @@
 8. [Critical Rules & Protocols](#8-critical-rules--protocols)
 9. [Implementation Status](#9-implementation-status)
 10. [Common AI Tasks](#10-common-ai-tasks)
+11. [Living Documentation Contract](#11-living-documentation-contract)
 
 ---
 
@@ -150,7 +151,7 @@ modelmux/
 - `rust_coding_conventions.md` - Rust-specific coding standards
 - Component-level documentation within each module
 
-**Rule**: Before making changes to any component, **always read its specific AGENT.md first** to understand:
+**Rule**: Before making changes to any component, **always read its specific AGENTS.md first** to understand:
 - Component architecture and responsibilities
 - Development workflows and testing approaches  
 - API patterns and integration points
@@ -194,8 +195,8 @@ modelmux
 ```
 
 ### Daily Development Workflow
-1. **Start**: Review current task in `task.md`
-2. **Plan**: Update task phases and current status
+1. **Start**: Review the current task in your private working notes (kept locally, never committed — see "Critical Rules & Protocols")
+2. **Plan**: Update task phases and current status in those notes
 3. **Research**: Read relevant component documentation
 4. **Implement**: Follow incremental development approach
 5. **Test**: Validate changes incrementally
@@ -269,7 +270,7 @@ brew install modelmux
 ## 8. Critical Rules & Protocols
 
 ### Rule 0: Read Component Documentation First
-**Before working on any specific component, ALWAYS read its AGENT.md file first.**
+**Before working on any specific component, ALWAYS read its AGENTS.md file first.**
 
 Component-specific files contain crucial information about:
 - Architecture patterns specific to that component
@@ -278,8 +279,12 @@ Component-specific files contain crucial information about:
 - Common issues and troubleshooting steps
 - Integration patterns with other services
 
-### Rule 1: Create Plan First
-Never start a complex task without creating a `task.md` file. Use the template in `tools/task_template.md`.
+### Rule 1: Create Plan First — Privately
+Never start a complex task without writing down a plan **locally**. Use the
+template in `tools/task_template.md` to scaffold a private working file
+(typical names: `task.md`, `plan.md`, or anything under `tasks/`). These
+locations are gitignored on purpose — they are scratch notes for the agent
+and the maintainer, never published.
 
 **When to create a task plan:**
 - Multi-step tasks (3+ steps)
@@ -291,6 +296,12 @@ Never start a complex task without creating a `task.md` file. Use the template i
 - OpenAI API compatibility changes
 - Authentication or provider configuration updates
 
+**Rule 1a — Never publish planning artefacts.** Do not commit `plan.md`,
+`task.md`, or anything under `tasks/`. Do not link to them from `README.md`,
+`ROADMAP.md`, `CHANGELOG.md`, or any other published doc. Public surfaces
+describe shipped behaviour and direction; the path to get there stays
+private.
+
 ### Rule 2: The 2-Action Rule
 > "After every 2 view/browser/search operations, IMMEDIATELY save key findings to text files."
 
@@ -300,14 +311,14 @@ This prevents loss of visual/multimodal information and maintains context across
 Before making major decisions, re-read the plan file and relevant documentation to ensure alignment with goals and architecture.
 
 ### Rule 4: Update After You Act
-After completing any phase:
+After completing any phase (in your private notes):
 - Mark phase status: `pending` → `in_progress` → `complete`
 - Log any errors encountered with resolution details
 - Note files created, modified, or deleted
 - Update decision log with rationale
 
 ### Rule 5: Log ALL Errors
-Every error goes in the task plan file with:
+Every error goes in your private task notes with:
 - Error description
 - Attempt number
 - Resolution approach
@@ -369,43 +380,42 @@ If you can answer these questions, your context management is solid:
 
 | Question | Answer Source |
 |----------|---------------|
-| Where am I? | Current phase in task.md |
-| Where am I going? | Remaining phases in task.md |
-| What's the goal? | Goal statement in plan |
-| What have I learned? | Findings and decisions in task.md |
-| What have I done? | Progress tracking in task.md |
+| Where am I? | Current phase in your private task notes |
+| Where am I going? | Remaining phases in your private task notes |
+| What's the goal? | Goal statement in your private plan |
+| What have I learned? | Findings and decisions in your private notes |
+| What have I done? | Progress tracking in your private notes |
 
 ---
 
 ## 9. Implementation Status
 
 ### Current Status
-**Version**: 0.5.0 (Production Ready)
+**Version**: 1.1.0 (Production Ready) — released 2026-05-23
 - ✅ OpenAI to Vertex AI (Claude) proxy
-- ✅ Streaming with intelligent client detection  
+- ✅ OpenAI-compatible provider abstraction (`LlmProviderBackend`)
+- ✅ Streaming with intelligent client detection
 - ✅ Tool/function calling support
 - ✅ Rust Edition 2024 with type safety
 - ✅ Comprehensive error handling
-- ✅ CLI interface with --version and --help
-- ✅ 30+ test suite coverage
-- ✅ Homebrew distribution ready
-- ✅ Professional packaging structure
+- ✅ CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`
+- ✅ TOML configuration with platform-native paths (XDG-style on Linux and macOS, Known-Folder on Windows)
+- ✅ **Automatic, idempotent macOS config migration to `~/.config/modelmux/`** (1.1.0)
+- ✅ Homebrew, systemd, .deb packaging
+- ✅ 37 unit tests green
 
 ### Roadmap
-**Phase 1**: Distribution & DevOps (Docker, validation tools, enhanced observability)
-**Phase 2**: Multi-Provider Universe (OpenAI, Anthropic Direct, Cohere, AWS Bedrock, Azure)
-**Phase 3**: Performance & Scale (caching, load balancing, auto-scaling)
-**Phase 4**: Enterprise Features (auth, compliance, cost management)
-**Phase 5**: AI-Native Features (model performance prediction, smart routing)
-**Phase 6**: Ecosystem & Extensions (plugin architecture, community hub)
 
-See [ROADMAP.md](ROADMAP.md) for detailed plans.
+See [ROADMAP.md](ROADMAP.md) — the single, public source of truth for where
+ModelMux is going. Per-task breakdowns and weekly plans are tracked in
+private working notes (gitignored); only public docs describe direction.
 
 ### Technical Debt
-- Provider abstraction could be enhanced for future multi-provider support
-- Configuration validation could be more comprehensive
-- Metrics and observability need Prometheus integration
-- Docker containerization not yet implemented
+- Provider abstraction works but needs a second concrete implementation (OpenAI-compatible) to validate the trait surface
+- Configuration validation could be more comprehensive (esp. provider-specific sections)
+- No Prometheus / OpenTelemetry integration yet
+- No Docker image yet
+- Legacy macOS-config fallback in the loader can be removed once 1.1.0 is widely deployed (next major release)
 
 ### Known Issues
 - Some edge cases in streaming client detection
@@ -467,11 +477,11 @@ See [ROADMAP.md](ROADMAP.md) for detailed plans.
 - [ ] Review logs for request/response patterns
 
 ### Documentation Updates
-- [ ] Keep component AGENT.md files current
+- [ ] Keep component AGENTS.md files current
 - [ ] Update API documentation for changes
 - [ ] Record architectural decisions
-- [ ] Maintain task planning discipline
-- [ ] Update this master AGENT.md as project evolves
+- [ ] Maintain task planning discipline (in private notes)
+- [ ] Update this master AGENTS.md as project evolves
 - [ ] Update README.md with configuration examples
 - [ ] Document new environment variables
 - [ ] Update OpenAI compatibility notes
@@ -480,18 +490,84 @@ See [ROADMAP.md](ROADMAP.md) for detailed plans.
 
 ---
 
+## 11. Living Documentation Contract
+
+> ModelMux ships with four **public** documents that the team treats as a
+> single coherent surface. They must stay in sync. Private working notes
+> (gitignored) are for the agent and maintainer only and never substitute
+> for these public docs.
+
+### The four canonical public documents
+
+| File | Owns |
+|------|------|
+| [`README.md`](README.md) | What ModelMux is, how to install and run it, the smallest correct quickstart, links to the rest |
+| [`CHANGELOG.md`](CHANGELOG.md) | Released history (Keep-a-Changelog format, SemVer) + an `[Unreleased]` section as a holding pen |
+| [`ROADMAP.md`](ROADMAP.md) | Vision and direction. Where we are, where we're going, *why* — not how. No internal task numbers. |
+| [`AGENTS.md`](AGENTS.md) | This file: principles, workflow, quality bars, and the sync contract that keeps the above three honest |
+
+### Private (gitignored, never published)
+
+- `plan.md`, `task.md`, anything under `tasks/`, `docs/RESEARCH_STRATEGY.md`
+- Scratch notes, per-feature breakdowns, research dumps
+- The agent uses these freely; **none of it appears in published docs**
+
+### Rules
+
+1. **Single PR, single state.** Any code change that ships behaviour visible
+   to users must, in the same PR, update at least:
+   - `CHANGELOG.md` under `[Unreleased]` (or the just-cut release section), and
+   - whichever of `README.md` / `ROADMAP.md` / `AGENTS.md` describe the
+     surface that changed.
+
+2. **Cutting a release rolls the docs.** When a version number is bumped in
+   `Cargo.toml`:
+   - Move `[Unreleased]` entries into a new `[X.Y.Z] - YYYY-MM-DD` section in `CHANGELOG.md`.
+   - Add the row to the Version History footer and a compare-link.
+   - Update the "Current release" banner in `ROADMAP.md`.
+   - Update `AGENTS.md` §9 "Current Status".
+   - Bump the URL in `packaging/homebrew/modelmux.rb` and update its `sha256`.
+   - Follow [`docs/RELEASING.md`](docs/RELEASING.md) for the rest.
+
+3. **README is not a changelog and not a roadmap.** Keep it tight; link to
+   `CHANGELOG.md` for history and `ROADMAP.md` for direction.
+
+4. **ROADMAP communicates vision, not internal numbering.** It says where
+   we're going and shows it (small code blocks, examples). It does not link
+   to task files, weekly plans, or anything from the private notes.
+
+5. **Private notes never leak.** Don't reference `plan.md`, `task.md`,
+   `tasks/`, internal `TASK-NNN` IDs, or research-only docs from any
+   published file. If a piece of context is worth publishing, lift it into
+   `README` / `CHANGELOG` / `ROADMAP` / `AGENTS` in shippable form.
+
+6. **The 5-minute sync check.** Before opening a PR, grep your diff for the
+   new version number and confirm each hit is consistent across the four
+   public documents and `Cargo.toml`. If any doc still describes the old
+   behaviour, fix it now, not in a follow-up.
+
+### Why this matters
+
+ModelMux is small enough that "the code is the spec" is tempting. It's also
+a trap: the moment a user reads `ROADMAP.md` and the code does something
+else, they file a confused issue and trust drops. We prefer boring,
+machine-greppable consistency on the public surface — and keep the messy
+day-to-day planning private.
+
+---
+
 ## Anti-Patterns to Avoid
 
 | ❌ Don't | ✅ Do Instead |
 |----------|---------------|
-| Use temporary notes for persistence | Create structured files (task.md, findings.md) |
+| Use temporary notes for persistence | Create structured private notes (e.g. local `task.md`, `findings.md`) |
 | State goals once and forget | Re-read plans before major decisions |
 | Hide errors and retry silently | Log all errors with resolution details |
 | Stuff everything in context | Store large content in organized files |
 | Start executing immediately | Create task plan FIRST |
 | Repeat failed actions | Track attempts, mutate approach systematically |
 | Violate SOLID principles for speed | Take time to design proper abstractions |
-| Skip component documentation | Always read component AGENT.md first |
+| Skip component documentation | Always read component AGENTS.md first |
 | Break OpenAI API compatibility | Test against multiple OpenAI client types |
 | Hardcode provider-specific logic | Use configurable provider abstractions |
 | Ignore streaming performance | Profile and optimize translation overhead |

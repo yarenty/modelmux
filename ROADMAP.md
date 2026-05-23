@@ -20,27 +20,37 @@
 
 ---
 
+## What this roadmap is
+
+- Where ModelMux is today, in one screen
+- Where it's going next, with bullets first and examples after
+- The shape of each phase — *what* and *why*, not *who* or *when*
+- A living vision, kept honest by [CHANGELOG.md](CHANGELOG.md)
+
 ## Vision
 
-ModelMux - think of it as the nginx for AI models.
+ModelMux — think of it as the nginx for AI models.
+One simple, OpenAI-compatible front door. Many backends behind it.
+Sane defaults, predictable config, no vendor lock-in.
 
 <!-- "The only way to get rid of temptation is to yield to it." - Oscar Wilde -->
 
 ---
 
-## Current Status: v0.2.0
+## Current Status: v1.1.0
 
-✅ **Production Ready**
-- OpenAI to Vertex AI (Claude) proxy
-- Streaming with intelligent client detection
-- Tool/function calling support
-- Rust Edition 2024 with type safety
-- Comprehensive error handling
-- CLI interface with `--version` and `--help` flags
-- Comprehensive test suite (30+ tests)
-- Homebrew deployment ready
-- Professional packaging structure
-- Dual MIT/Apache licensing
+✅ **Production-ready, predictable, easy to configure**
+
+- OpenAI → Vertex AI (Anthropic Claude) proxy with streaming and tool calling
+- Smart client detection (IDEs / browsers / CLI) and three streaming modes (auto / standard / buffered / never / always)
+- Rust Edition 2024 with comprehensive type-safe error handling
+- CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`
+- TOML configuration with multi-layered hierarchy (CLI > env > user > system > defaults)
+- **Predictable paths everywhere** — Linux *and* macOS use `~/.config/modelmux/`
+- **Automatic, idempotent macOS migration** from the legacy `~/Library/Application Support/...` location, with absolute-path rewriting inside `config.toml`
+- Homebrew formula + `brew services` background service
+- systemd units (system + user) and `.deb` packages for Ubuntu/Debian
+- 37 unit tests green; dual MIT / Apache-2.0 license
 
 ---
 
@@ -50,29 +60,33 @@ ModelMux - think of it as the nginx for AI models.
 
 **Homebrew Formula**
 ```bash
+brew tap yarenty/tap
 brew install modelmux
 modelmux --version
 ```
 
-**Docker Images**
+**Docker Images** *(planned)*
 ```bash
 docker run -p 3000:3000 yarenty/modelmux:latest
 ```
 
 **Binary Releases**
-- Linux (x86_64, ARM64)
-- macOS (Intel, Apple Silicon)
-- Windows (x86_64)
+- ✅ Linux (x86_64, ARM64) — `.deb` packages and tarballs
+- ✅ macOS (Intel, Apple Silicon) — Homebrew + tarballs
+- 🔄 Windows (x86_64)
 
 ### DevOps & Tooling
 
 **Configuration Validation**
 ```bash
-modelmux validate config.yaml
-modelmux doctor  # Health check for setup
+modelmux config validate     # ✅ shipping
+modelmux doctor              # ✅ shipping
+modelmux config init         # ✅ interactive setup
+modelmux config show         # ✅ shows current effective config
+modelmux config edit         # ✅ opens config in $EDITOR
 ```
 
-**Enhanced Observability**
+**Enhanced Observability** *(planned)*
 - Prometheus metrics export
 - OpenTelemetry tracing
 - Structured JSON logging
@@ -80,7 +94,7 @@ modelmux doctor  # Health check for setup
 
 > *"I refuse to belong to any club that would accept me as one of its members."* — Groucho Marx
 
-### Monitoring Dashboard
+### Monitoring Dashboard *(planned)*
 
 **Web UI** (`/dashboard`)
 - Real-time request metrics
@@ -95,61 +109,66 @@ modelmux doctor  # Health check for setup
 ### Provider Ecosystem
 
 **Core Providers**
-- ✅ Vertex AI (Anthropic Claude) 
-- 🔄 OpenAI (GPT-4, GPT-3.5)
+- ✅ Vertex AI (Anthropic Claude)
+- 🔄 OpenAI-compatible (vLLM, llama.cpp, LM Studio, any `/v1/chat/completions` server)
 - 🔄 Anthropic (Direct API)
-- 🔄 Cohere (Command, Embed)
+- 🔄 OpenAI (GPT-4, GPT-3.5)
 - 🔄 AWS Bedrock (Multiple models)
 - 🔄 Azure OpenAI Service
+- 🔄 Cohere (Command, Embed)
 - 🔄 Hugging Face Inference API
 
 **Provider Configuration**
-```yaml
-providers:
-  - name: openai
-    type: openai
-    api_key: ${OPENAI_API_KEY}
-    models: ["gpt-4", "gpt-3.5-turbo"]
-  
-  - name: anthropic
-    type: anthropic
-    api_key: ${ANTHROPIC_API_KEY}
-    models: ["claude-3-opus", "claude-3-sonnet"]
+```toml
+[[provider]]
+name = "vertex"
+type = "vertex"
+project = "my-gcp-project"
+region = "europe-west1"
+model = "claude-3-5-sonnet@20241022"
 
-routing:
-  strategy: cost_optimized
-  fallback: true
+[[provider]]
+name = "vllm-local"
+type = "openai_compatible"
+base_url = "http://localhost:8000/v1"
+api_key = "${VLLM_API_KEY}"
+model = "meta-llama/Llama-3-8B-Instruct"
+
+[routing]
+strategy = "cost_optimized"
+fallback = true
 ```
 
-### 🎯 Intelligent Routing
+### Intelligent Routing
 
 **Routing Strategies**
-- `round_robin` - Equal distribution
-- `latency` - Route to fastest provider
-- `cost` - Route to cheapest model
-- `availability` - Route around failures
-- `model_specific` - Route by model capabilities
-- `geographic` - Route by user location
-- `custom` - Lua scripting for complex logic
+- `round_robin` — equal distribution
+- `latency` — route to fastest provider
+- `cost` — route to cheapest model
+- `availability` — route around failures
+- `model_specific` — route by model capability
+- `geographic` — route by user location
+- `custom` — small DSL for complex logic
 
 <!-- "The trouble with quotes on the Internet is that you can never verify their authenticity." - Abraham Lincoln -->
 
 **Advanced Features**
-```yaml
-routing:
-  strategy: hybrid
-  rules:
-    - if: model == "gpt-4"
-      provider: openai
-    - if: cost_sensitive == true
-      provider: cohere
-    - if: latency < 100ms
-      provider: local_llm
-  
-  fallback:
-    enabled: true
-    max_retries: 3
-    backoff: exponential
+```toml
+[routing]
+strategy = "hybrid"
+
+[[routing.rules]]
+when = 'model == "gpt-4"'
+provider = "openai"
+
+[[routing.rules]]
+when = "cost_sensitive == true"
+provider = "vllm-local"
+
+[routing.fallback]
+enabled = true
+max_retries = 3
+backoff = "exponential"
 ```
 
 ---
@@ -159,21 +178,24 @@ routing:
 ### ⚡ High-Performance Features
 
 **Caching Layer**
-```yaml
-caching:
-  enabled: true
-  backend: redis
-  ttl: 300s
-  rules:
-    - cache_if: deterministic == true
-    - skip_if: stream == true
+```toml
+[cache]
+enabled = true
+backend = "redis"       # or "memory"
+ttl_seconds = 300
+
+[[cache.rules]]
+cache_if = "deterministic == true"
+
+[[cache.rules]]
+skip_if = "stream == true"
 ```
 
 **Connection Pooling**
 - HTTP/2 multiplexing
 - Keep-alive optimization
 - Circuit breaker patterns
-- Rate limiting per provider
+- Per-provider rate limiting
 
 **Load Balancing**
 - Weighted round-robin
@@ -185,10 +207,10 @@ caching:
 
 ```bash
 # Configuration changes without restart
-modelmux reload config.yaml
+modelmux reload
 
-# Zero-downtime updates
-modelmux upgrade --version 0.2.0
+# Zero-downtime binary upgrade
+modelmux upgrade
 ```
 
 > *"I am so clever that sometimes I don't understand a single word of what I am saying."* — Oscar Wilde
@@ -204,8 +226,8 @@ metadata:
 spec:
   replicas: 3
   providers:
+    - vertex
     - openai
-    - anthropic
   scaling:
     enabled: true
     minReplicas: 1
@@ -233,42 +255,44 @@ spec:
 ### Cost Management
 
 **Usage Analytics**
-```yaml
-analytics:
-  cost_tracking:
-    enabled: true
-    budgets:
-      monthly: $1000
-      alerts_at: 80%
-  
-  usage_reports:
-    schedule: daily
-    destinations: [email, webhook]
+```toml
+[analytics.cost_tracking]
+enabled = true
+monthly_budget = 1000
+alert_at = 0.8
+
+[analytics.usage_reports]
+schedule = "daily"
+destinations = ["email", "webhook"]
 ```
 
 **Provider Cost Optimization**
-- Real-time cost tracking
-- Budget alerts and limits
+- Real-time cost tracking per request
+- Budget alerts and hard limits
 - Cost prediction modeling
-- Provider cost comparison
+- Side-by-side provider cost comparison
 
 <!-- "The Internet is becoming the town square for the global village of tomorrow." - Confucius -->
 
 ### Global Deployment
 
 **Multi-Region Support**
-```yaml
-regions:
-  us-east-1:
-    providers: [openai, anthropic]
-  europe-west1:
-    providers: [vertex_ai]
-  asia-southeast1:
-    providers: [bedrock]
+```toml
+[[regions]]
+name = "us-east-1"
+providers = ["openai", "anthropic"]
 
-routing:
-  geographic: true
-  data_residency: enforced
+[[regions]]
+name = "europe-west1"
+providers = ["vertex"]
+
+[[regions]]
+name = "asia-southeast1"
+providers = ["bedrock"]
+
+[routing]
+geographic = true
+data_residency = "enforced"
 ```
 
 ---
@@ -279,13 +303,12 @@ routing:
 
 **Model Performance Prediction**
 - Automatic A/B testing between providers
-- Quality scoring for responses
+- Response quality scoring
 - Latency prediction
 - Cost-effectiveness analysis
 
 **Smart Prompt Routing**
 ```rust
-// Route based on prompt analysis
 if prompt.contains_code() {
     route_to("claude-3-opus");
 } else if prompt.is_creative() {
@@ -304,16 +327,21 @@ if prompt.contains_code() {
 - Consensus-based answers
 
 **Model Composition**
-```yaml
-pipelines:
-  - name: research_assistant
-    steps:
-      - provider: cohere
-        task: summarize
-      - provider: gpt-4
-        task: analyze
-      - provider: claude
-        task: write_report
+```toml
+[[pipelines]]
+name = "research_assistant"
+
+[[pipelines.steps]]
+provider = "cohere"
+task = "summarize"
+
+[[pipelines.steps]]
+provider = "openai"
+task = "analyze"
+
+[[pipelines.steps]]
+provider = "anthropic"
+task = "write_report"
 ```
 
 > *"The secret of getting ahead is getting started."* — Mark Twain (who definitely never used an API)
@@ -324,7 +352,7 @@ pipelines:
 - Usage pattern prediction
 - Capacity planning
 - Provider availability prediction
-- Cost optimization suggestions
+- Cost-optimization suggestions
 
 ---
 
@@ -342,7 +370,7 @@ struct CustomLLM {
 
 impl Provider for CustomLLM {
     async fn chat_completion(&self, request: ChatRequest) -> Result<ChatResponse> {
-        // Custom implementation
+        // your magic here
     }
 }
 ```
@@ -362,11 +390,11 @@ async fn pii_filter(request: &mut Request) -> Result<()> {
 - Community provider plugins
 - Shared routing configurations
 - Performance benchmarks
-- Best practices repository
+- Best-practices repository
 
 **TUI Dashboard**
 ```bash
-modelmux tui  # Terminal UI for monitoring
+modelmux tui   # Terminal UI for monitoring
 ```
 
 <!-- "I love deadlines. I love the whooshing noise they make as they go by." - Douglas Adams -->
@@ -378,7 +406,7 @@ modelmux tui  # Terminal UI for monitoring
 ### Code Quality
 - [ ] Comprehensive benchmarking suite
 - [ ] Fuzz testing for security
-- [ ] Memory leak detection
+- [ ] Memory-leak detection
 - [ ] Performance profiling tools
 
 ### Documentation
@@ -388,9 +416,9 @@ modelmux tui  # Terminal UI for monitoring
 - [ ] Architecture decision records
 
 ### Testing
-- [ ] End-to-end test suite
-- [ ] Load testing framework
-- [ ] Chaos engineering tests
+- [ ] End-to-end test suite (integration harness)
+- [ ] Load-testing framework
+- [ ] Chaos-engineering tests
 - [ ] Provider compatibility matrix
 
 ---
@@ -433,6 +461,7 @@ modelmux tui  # Terminal UI for monitoring
 
 **Contributing to the Roadmap**
 
-Have ideas? Open an issue or discussion on GitHub. The roadmap is living document that evolves with community needs and technological advances.
+Have ideas? Open an issue or discussion on GitHub. The roadmap is a living
+document that evolves with community needs and technological advances.
 
 <!-- "In the end, we will remember not the words of our enemies, but the silence of our friends." - Martin Luther King Jr. (API design) -->

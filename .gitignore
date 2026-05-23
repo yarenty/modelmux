@@ -25,3 +25,10 @@ install.tar.gz
 
 # Local cargo configuration (build optimizations)
 .cargo/config.toml
+
+# Private planning / task tracking — never published, not for git
+plan.md
+task.md
+tasks/
+
+

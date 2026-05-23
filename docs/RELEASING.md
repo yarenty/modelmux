@@ -2,37 +2,45 @@
 
 Step-by-step guide for releasing new versions of ModelMux, including Homebrew and Linux/Ubuntu deployment.
 
+> **Sync rule**: a release bump touches more than `Cargo.toml`. See
+> [`AGENTS.md`](../AGENTS.md) §11 "Living Documentation Contract" for the full
+> docs-sync checklist (CHANGELOG, ROADMAP, AGENTS.md, README, formula).
+
 ## Quick Release Checklist
 
 ```bash
 # 1. Update version in Cargo.toml
-vim Cargo.toml  # Update version field
+vim Cargo.toml  # Update version field (e.g. 1.1.0)
 
-# 2. Update version in Homebrew formula
-vim packaging/homebrew/modelmux.rb  # Update url and version
+# 2. Roll [Unreleased] → [1.1.0] in CHANGELOG.md, add compare-link footer
 
-# 3. Run tests
+# 3. Update "Current release" banner in ROADMAP.md and AGENTS.md §9
+
+# 4. Update version in Homebrew formula
+vim packaging/homebrew/modelmux.rb  # Update url; reset sha256 to placeholder
+
+# 5. Run tests
 cargo test
 
-# 4. Build release binary
+# 6. Build release binary
 cargo build --release
-./target/release/modelmux --version
+./target/release/modelmux --version  # should print 1.1.0
 
-# 5. Commit and tag
-git add Cargo.toml packaging/homebrew/modelmux.rb CHANGELOG.md
-git commit -m "Release v0.5.0"
-git tag v0.5.0
+# 7. Commit and tag
+git add Cargo.toml Cargo.lock packaging/homebrew/modelmux.rb CHANGELOG.md ROADMAP.md AGENTS.md README.md
+git commit -m "Release v1.1.0"
+git tag v1.1.0
 git push origin main --tags
 
-# 6. Create GitHub release (via web UI)
-# - Upload source tarball
-# - Get SHA256: shasum -a 256 modelmux-0.1.0.tar.gz
+# 8. Create GitHub release (via web UI)
+# - Tag v1.1.0; GitHub auto-generates the source tarball
+# - Get its SHA256:
+#     curl -sL https://github.com/yarenty/modelmux/archive/refs/tags/v1.1.0.tar.gz | shasum -a 256
 
-# 7. Update Homebrew formula with SHA256
-vim packaging/homebrew/modelmux.rb  # Update sha256 field
+# 9. Replace the placeholder sha256 in packaging/homebrew/modelmux.rb
+vim packaging/homebrew/modelmux.rb
 
-# 8. Test Homebrew formula locally (use a local tap - see section 7)
-# 9. Publish to your Homebrew tap (see section 8)
+# 10. Test the formula locally (see section 7) and publish to the tap (section 8)
 ```
 
 ## Detailed Steps
@@ -42,12 +50,12 @@ vim packaging/homebrew/modelmux.rb  # Update sha256 field
 **Cargo.toml:**
 ```toml
 [package]
-version = "0.5.0"  # Update this
+version = "1.1.0"  # Update this
 ```
 
 **packaging/homebrew/modelmux.rb:**
 ```ruby
-url "https://github.com/yarenty/modelmux/archive/refs/tags/v0.5.0.tar.gz"
+url "https://github.com/yarenty/modelmux/archive/refs/tags/v1.1.0.tar.gz"
 # Update version in URL; replace sha256 after creating the release tarball
 ```
 

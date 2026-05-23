@@ -42,7 +42,7 @@ Phase 1
 - [ ] Understand user intent and business requirements
 - [ ] Identify constraints, dependencies, and integration points
 - [ ] Review existing codebase and architectural patterns
-- [ ] Read component-specific AGENT.md files if applicable
+- [ ] Read component-specific AGENTS.md files if applicable
 - [ ] Document findings and architectural context
 - **Status:** in_progress
 <!-- 
@@ -165,7 +165,7 @@ Phase 1
   - Log ALL errors - they help avoid repetition
   - Never repeat a failed action - mutate your approach instead
   - Always consider SOLID principles when making design decisions
-  - Read component AGENT.md files before modifying existing code
+  - Read component AGENTS.md files before modifying existing code
 -->
 - Update phase status as you progress: pending → in_progress → complete
 - Re-read this plan before major decisions (attention manipulation)

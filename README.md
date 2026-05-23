@@ -32,17 +32,17 @@ ModelMux is a production-ready, async Rust proxy that acts as a drop-in replacem
 It translates OpenAI-compatible requests into Google Vertex AI (Anthropic Claude) calls while preserving streaming, tool/function calling, and error semantics.
 Designed for performance, safety, and clean architecture, ModelMux is ideal for teams standardizing on OpenAI APIs while running on Vertex AI infrastructure.
 
-## 🎉 New in v1.0.0: Production Ready
+## 🎉 New in v1.1.0: Predictable Config on macOS
 
-ModelMux v1.0.0 adds service management and Linux packaging:
+ModelMux v1.1.0 stops hiding configuration under `~/Library/Application Support/...` on macOS:
 
-- **🍺 Brew services**: `brew services start modelmux` — run as a background service (macOS)
-- **🐧 systemd daemon**: Linux system and user service units — see `packaging/systemd/`
-- **📦 .deb packages**: Install on Ubuntu/Debian with `dpkg -i modelmux_*.deb`
-- **🏗️ Multi-layered configuration**: CLI args > env vars > user config > system config > defaults
-- **📝 TOML configuration**: Human-readable config files; `modelmux config init` for quick setup
+- **📁 XDG-style paths everywhere**: macOS now uses `~/.config/modelmux/config.toml`, matching Linux.
+- **🤖 Automatic migration**: an idempotent migrator moves any legacy config + service-account on first run, and rewrites absolute paths inside `config.toml` for you.
+- **🛡️ Safe by design**: never overwrites existing files; safe to re-run; loader keeps a fallback for users who skip it.
 
-**Quick setup**: `modelmux config init` creates your configuration interactively!
+Existing v1.0.0 features still here: Homebrew services, systemd daemon, .deb packages, TOML config, multi-layered hierarchy (CLI > env > user > system > defaults).
+
+**Quick setup**: `modelmux config init` creates your configuration interactively.
 
 
 <p align="center">
@@ -557,24 +557,8 @@ cargo run
 
 ## Roadmap
 
-*See [ROADMAP.md](ROADMAP.md) for detailed future plans.*
-
-**✅ Completed in v1.0.0:**
-- ✅ Brew services and systemd daemon support
-- ✅ .deb packages for Ubuntu/Debian (amd64, arm64)
-- ✅ Professional configuration system with TOML files
-- ✅ CLI configuration management (`modelmux config init/show/edit`)
-
-**Near term:**
-- Docker container images
-- Enhanced metrics and monitoring (Prometheus, OpenTelemetry)
-
-**Future:**
-- Multiple provider support (OpenAI, Anthropic, Cohere, etc.)
-- Intelligent request routing and load balancing
-- Request/response caching layer
-- Web UI for configuration and monitoring
-- Advanced analytics and usage insights
+Where ModelMux is headed: see **[ROADMAP.md](ROADMAP.md)**.
+Detailed change history: **[CHANGELOG.md](CHANGELOG.md)**.
 
 ---
 
