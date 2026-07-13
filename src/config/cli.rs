@@ -145,8 +145,19 @@ impl ConfigCli {
         println!("LLM Provider Configuration:");
         if let Some(ref provider) = config.llm_provider {
             println!("  Provider: {}", provider.id());
-            println!("  Model: {}", provider.display_model_name());
-            println!("  Request URL: {}", provider.build_request_url(false));
+            println!("  Default model: {}", provider.display_model_name());
+            println!("  Default URL: {}", provider.build_request_url(false));
+
+            // Show all configured models (default + named entries)
+            let model_names = config.list_model_names();
+            if model_names.len() > 1 {
+                println!();
+                println!("  Configured models ({} total):", model_names.len());
+                for name in &model_names {
+                    let url = config.build_predict_url_for_model(Some(name), false);
+                    println!("    • {} → {}", name, url);
+                }
+            }
         } else {
             println!("  Provider: Not loaded (will be detected from environment)");
         }
@@ -288,6 +299,16 @@ impl ConfigCli {
                 println!("⚠️  Port {} may be in use", config.server.port);
                 println!("   This might be okay if another ModelMux instance is running");
             }
+        }
+
+        // Show all configured models with their resolved endpoints
+        println!();
+        println!("Model Routing:");
+        let model_names = config.list_model_names();
+        println!("  Configured models ({} total):", model_names.len());
+        for name in &model_names {
+            let url = config.build_predict_url_for_model(Some(name), false);
+            println!("    • {} → {}", name, url);
         }
 
         Ok(())

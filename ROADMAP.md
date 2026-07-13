@@ -37,18 +37,19 @@ Sane defaults, predictable config, no vendor lock-in.
 
 ---
 
-## Current Status: v1.2.0
+## Current Status: v1.3.0
 
 ✅ **Production-ready, predictable, easy to configure**
 
 - OpenAI → Vertex AI (Anthropic Claude) proxy with streaming and tool calling
 - Smart client detection (IDEs / browsers / CLI) and three streaming modes (auto / standard / buffered / never / always)
-- **Multi-model routing**: clients pick a model by name; the proxy routes to the correct Vertex AI endpoint
+- **Multi-model routing**: clients pick a model by name; the proxy routes to the correct Vertex AI endpoint via `[[vertex.models]]` config
+- **`modelmux logs` / `logs -f`**: inspect and tail log files directly from the CLI
 - Rust Edition 2024 with comprehensive type-safe error handling
-- CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`
+- CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`, `logs`
 - TOML configuration with multi-layered hierarchy (CLI > env > user > system > defaults)
 - **Predictable paths everywhere** — Linux *and* macOS use `~/.config/modelmux/`
-- **Automatic, idempotent macOS migration** from the legacy `~/Library/Application Support/...` location, with absolute-path rewriting inside `config.toml`
+- **Automatic, idempotent macOS migration** from the legacy `~/Library/Application Support/...` location
 - Homebrew formula + `brew services` background service
 - systemd units (system + user) and `.deb` packages for Ubuntu/Debian
 - 37 unit tests green; dual MIT / Apache-2.0 license

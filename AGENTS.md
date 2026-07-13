@@ -391,15 +391,16 @@ If you can answer these questions, your context management is solid:
 ## 9. Implementation Status
 
 ### Current Status
-**Version**: 1.2.0 (Production Ready) — released 2026-07-13
+**Version**: 1.3.0 (Production Ready) — released 2026-07-13
 - ✅ OpenAI to Vertex AI (Claude) proxy
 - ✅ OpenAI-compatible provider abstraction (`LlmProviderBackend`)
 - ✅ Streaming with intelligent client detection
 - ✅ Tool/function calling support
 - ✅ **Multi-model routing**: clients select a model by name; proxy routes to the correct Vertex AI endpoint via `[[vertex.models]]` config
+- ✅ **`modelmux logs` / `logs -f`**: inspect and live-tail log files from the CLI
 - ✅ Rust Edition 2024 with type safety
 - ✅ Comprehensive error handling
-- ✅ CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`
+- ✅ CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`, `logs`
 - ✅ TOML configuration with platform-native paths (XDG-style on Linux and macOS, Known-Folder on Windows)
 - ✅ **Automatic, idempotent macOS config migration to `~/.config/modelmux/`** (1.1.0)
 - ✅ Homebrew, systemd, .deb packaging

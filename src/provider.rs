@@ -351,9 +351,15 @@ impl VertexProvider {
         let entry = cfg.models.iter().find(|e| e.name.eq_ignore_ascii_case(name))?;
 
         let resource_url = if let Some(ref url) = entry.url {
+            // Entry has its own explicit URL — use it directly.
             Self::strip_predict_method_suffix(url.trim())
-        } else {
-            // Resolve each field: entry override > parent cfg > error
+        } else if entry.region.is_some()
+            || entry.project.is_some()
+            || entry.location.is_some()
+            || entry.publisher.is_some()
+        {
+            // Entry overrides at least one structural field (publisher, region, etc.).
+            // Rebuild the full URL from parts; unset fields inherit from the parent [vertex] block.
             let region = entry
                 .region
                 .as_deref()
@@ -382,6 +388,33 @@ impl VertexProvider {
                 .unwrap_or("")
                 .trim()
                 .to_string();
+            let model_id = entry.model.trim().to_string();
+
+            if region.is_empty() || project.is_empty() || location.is_empty() || publisher.is_empty() || model_id.is_empty() {
+                tracing::warn!(
+                    "Model entry '{}' is missing required fields (region/project/location/publisher/model); \
+                     falling back to default model",
+                    name
+                );
+                return None;
+            }
+
+            format!(
+                "https://{}-aiplatform.googleapis.com/v1/projects/{}/locations/{}/publishers/{}/models/{}",
+                region, project, location, publisher, model_id
+            )
+        } else if let Some(ref parent_url) = cfg.url {
+            // No structural overrides and no per-entry URL, but the parent [vertex] block
+            // has a url override. Reuse the parent URL, swapping only the model ID at the end.
+            let base = Self::strip_predict_method_suffix(parent_url.trim());
+            let prefix = base.rfind('/').map(|i| &base[..=i]).unwrap_or(&base);
+            format!("{}{}", prefix, entry.model.trim())
+        } else {
+            // No URL anywhere — build from parent fields + entry model ID.
+            let region = cfg.region.as_deref().unwrap_or("").trim().to_string();
+            let project = cfg.project.as_deref().unwrap_or("").trim().to_string();
+            let location = cfg.location.as_deref().unwrap_or("").trim().to_string();
+            let publisher = cfg.publisher.as_deref().unwrap_or("").trim().to_string();
             let model_id = entry.model.trim().to_string();
 
             if region.is_empty() || project.is_empty() || location.is_empty() || publisher.is_empty() || model_id.is_empty() {

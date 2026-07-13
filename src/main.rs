@@ -218,6 +218,11 @@ async fn handle_cli_args() -> Option<i32> {
             let exit_code = run_validate();
             Some(exit_code)
         }
+        "logs" => {
+            let follow = args.get(2).map(|a| a == "-f" || a == "--follow").unwrap_or(false);
+            let exit_code = run_logs(follow);
+            Some(exit_code)
+        }
         _ => {
             // Unknown command or option - show error and help
             if args[1].starts_with('-') {
@@ -232,6 +237,7 @@ async fn handle_cli_args() -> Option<i32> {
                 eprintln!("  config    - Configuration management");
                 eprintln!("  doctor    - Run configuration health check");
                 eprintln!("  validate  - Validate configuration");
+                eprintln!("  logs      - Show log file location and recent entries");
                 eprintln!();
                 eprintln!("Available options:");
                 eprintln!("  --version, -V  - Show version");
@@ -362,6 +368,8 @@ fn print_help() {
     println!("    modelmux                    Start the proxy server");
     println!("    modelmux doctor             Check configuration");
     println!("    modelmux validate           Validate and exit");
+    println!("    modelmux logs               Show log directory and recent entries");
+    println!("    modelmux logs -f            Follow (tail) the latest log file");
     println!();
     println!("For more information, visit: https://github.com/yarenty/modelmux");
 }
@@ -427,6 +435,14 @@ fn run_doctor() -> i32 {
                         println!("  LLM provider: Not loaded");
                     }
                     println!("  Streaming mode: {:?}", config.streaming.mode);
+
+                    // Show all configured models with their resolved endpoints
+                    let model_names = config.list_model_names();
+                    println!("  Models ({} configured):", model_names.len());
+                    for name in &model_names {
+                        let url = config.build_predict_url_for_model(Some(name), false);
+                        println!("    • {} → {}", name, url);
+                    }
 
                     if let Some(ref file) = config.auth.service_account_file {
                         match crate::config::paths::expand_path(file) {
@@ -501,6 +517,117 @@ fn run_validate() -> i32 {
             1
         }
     }
+}
+
+///
+/// Show log file location, list recent log files, and optionally tail the latest one.
+///
+/// Usage:
+///   modelmux logs          — list log files, print the last 50 lines of the newest
+///   modelmux logs -f       — same, then follow (tail -f) the newest log file
+///
+/// Returns exit code 0 on success, 1 if the log directory cannot be resolved.
+fn run_logs(follow: bool) -> i32 {
+    use std::fs;
+    use std::io::{BufRead, BufReader, Seek, SeekFrom};
+    use std::time::Duration;
+
+    let log_dir = match crate::config::paths::user_log_dir() {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("❌ Cannot resolve log directory: {}", e);
+            return 1;
+        }
+    };
+
+    println!("📂 Log directory: {}", log_dir.display());
+    println!();
+
+    // Collect and sort log files newest-first.
+    let mut files: Vec<_> = match fs::read_dir(&log_dir) {
+        Ok(entries) => entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_file())
+            .collect(),
+        Err(e) => {
+            eprintln!("❌ Cannot read log directory: {}", e);
+            return 1;
+        }
+    };
+
+    if files.is_empty() {
+        println!("No log files found. ModelMux writes logs here once it has run at least once.");
+        return 0;
+    }
+
+    // Sort by modification time, newest first.
+    files.sort_by(|a, b| {
+        let ta = a.metadata().and_then(|m| m.modified()).ok();
+        let tb = b.metadata().and_then(|m| m.modified()).ok();
+        tb.cmp(&ta)
+    });
+
+    println!("Log files ({} total):", files.len());
+    for (i, f) in files.iter().enumerate() {
+        let size = f.metadata().map(|m| m.len()).unwrap_or(0);
+        let marker = if i == 0 { " <-- latest" } else { "" };
+        println!("  {}  ({} bytes){}", f.path().display(), size, marker);
+    }
+    println!();
+
+    let latest = files[0].path();
+    println!("--- Last 50 lines of {} ---", latest.display());
+    println!();
+
+    // Print last 50 lines.
+    let print_tail = |path: &std::path::Path, lines: usize| {
+        if let Ok(file) = fs::File::open(path) {
+            let reader = BufReader::new(file);
+            let all: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+            let start = all.len().saturating_sub(lines);
+            for line in &all[start..] {
+                println!("{}", line);
+            }
+        }
+    };
+
+    print_tail(&latest, 50);
+
+    if follow {
+        println!();
+        println!("--- Following {} (Ctrl-C to stop) ---", latest.display());
+        println!();
+
+        // Open file and seek to end, then poll for new content.
+        let mut file = match fs::File::open(&latest) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("❌ Cannot open log file: {}", e);
+                return 1;
+            }
+        };
+        file.seek(SeekFrom::End(0)).ok();
+        let mut reader = BufReader::new(file);
+
+        loop {
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => {
+                    // No new data yet — wait a moment and retry.
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+                Ok(_) => {
+                    print!("{}", line);
+                }
+                Err(e) => {
+                    eprintln!("❌ Read error: {}", e);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    0
 }
 
 ///

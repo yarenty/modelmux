@@ -5,6 +5,40 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-13
+
+### Added
+
+- **`modelmux logs`**: new command to inspect log files without hunting for the directory.
+  - Lists all log files (newest first) with sizes.
+  - Prints the last 50 lines of the current log.
+  - `modelmux logs -f` / `--follow` tails the log live (like `tail -f`), polling every 200 ms.
+- **Doctor / validate show all configured models**: `modelmux doctor`, `modelmux validate`,
+  and `modelmux config show` now print every model alias and its resolved Vertex AI endpoint,
+  making it easy to verify multi-model routing at a glance.
+
+### Fixed
+
+- **Multi-model routing with `url` override** (`[[vertex.models]]`): when the parent `[vertex]`
+  block uses `url` instead of individual region/project/location fields, named model entries
+  now correctly inherit the parent URL and substitute only the model ID at the end of the path.
+  Previously the field-based builder was used, producing an invalid URL (e.g.
+  `https://global-aiplatform.googleapis.com/...`) and a 500 error.
+- **Publisher override triggers full URL rebuild**: if a `[[vertex.models]]` entry sets
+  `publisher` (or any structural field), a full URL is rebuilt from parts so the publisher
+  segment is correct, rather than blindly swapping the model ID in the parent URL.
+
+### URL resolution priority for `[[vertex.models]]` entries
+
+```
+1. entry.url set                    → use directly
+2. entry overrides publisher/region/project/location → rebuild full URL from parts
+3. parent [vertex].url set          → swap model ID at end of parent URL
+4. fallback                         → build from parent fields + entry model ID
+```
+
+---
+
 ## [1.2.0] - 2026-07-13
 
 ### Added
@@ -370,6 +404,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
+- **1.3.0** (2026-07-13): `modelmux logs` command; doctor/validate show model routing; fix multi-model URL resolution with `url` override and publisher override
 - **1.2.0** (2026-07-13): Support for multiple models — route requests by model name via `[[vertex.models]]`
 - **1.1.0** (2026-05-23): macOS `~/.config/modelmux/` paths + auto-migration; rotating logs (~30 days retention)
 - **1.0.0** (2026-02-17): Brew services, systemd daemon, .deb packaging, Linux release
@@ -380,6 +415,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.3.0]: https://github.com/yarenty/modelmux/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/yarenty/modelmux/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/yarenty/modelmux/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/yarenty/modelmux/compare/v0.6.0...v1.0.0
