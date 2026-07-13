@@ -37,7 +37,7 @@ Sane defaults, predictable config, no vendor lock-in.
 
 ---
 
-## Current Status: v1.3.3
+## Current Status: v1.3.4
 
 ✅ **Production-ready, predictable, easy to configure**
 

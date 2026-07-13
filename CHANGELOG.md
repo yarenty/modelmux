@@ -5,6 +5,19 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-07-13
+
+### Fixed
+
+- **`global` region now correctly produces `aiplatform.googleapis.com`** host in all URL
+  construction paths. Added `vertex_host(region)` helper: `global` → `aiplatform.googleapis.com`,
+  anything else → `{region}-aiplatform.googleapis.com`. Applied uniformly to default model,
+  env-var model, and all `[[vertex.models]]` entries — no special cases needed in config.
+- Removed the `ParsedVertexUrl` struct and URL-parsing fallback; no longer needed now that
+  the host is always derived directly and correctly from the `region` field.
+
+---
+
 ## [1.3.3] - 2026-07-13
 
 ### Fixed
@@ -451,6 +464,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
+- **1.3.4** (2026-07-13): `global` region correctly maps to `aiplatform.googleapis.com` in all URL paths
 - **1.3.3** (2026-07-13): Fix root cause of multi-model routing — `build_predict_url_for_model` let-chain fallthrough
 - **1.3.2** (2026-07-13): Multi-model URL construction fully structural — parse parent `url` into components, no string surgery
 - **1.3.1** (2026-07-13): Fix default model URL ignoring `[vertex].url` when individual fields also set
@@ -465,6 +479,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.3.4]: https://github.com/yarenty/modelmux/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/yarenty/modelmux/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/yarenty/modelmux/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/yarenty/modelmux/compare/v1.3.0...v1.3.1
