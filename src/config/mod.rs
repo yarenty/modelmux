@@ -410,15 +410,17 @@ impl Config {
     /// Looks up the model in `[vertex.models]` by name (case-insensitive). Falls back to
     /// the default provider URL if the name is not found or is empty.
     pub fn build_predict_url_for_model(&self, model_name: Option<&str>, is_streaming: bool) -> String {
-        if let Some(name) = model_name
-            && !name.is_empty()
-            && let Some(LlmProviderConfig::Vertex(_)) = self.llm_provider.as_ref()
-            && let Some(vertex_cfg) = self.vertex.as_ref()
-        {
-            if let Some(url) =
-                crate::provider::VertexProvider::build_url_for_named_model(name, vertex_cfg, is_streaming)
-            {
-                return url;
+        if let Some(name) = model_name {
+            if !name.is_empty() {
+                if let Some(LlmProviderConfig::Vertex(_)) = self.llm_provider.as_ref() {
+                    if let Some(vertex_cfg) = self.vertex.as_ref() {
+                        if let Some(url) = crate::provider::VertexProvider::build_url_for_named_model(
+                            name, vertex_cfg, is_streaming,
+                        ) {
+                            return url;
+                        }
+                    }
+                }
             }
         }
         self.build_predict_url(is_streaming)

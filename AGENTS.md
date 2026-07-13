@@ -391,7 +391,7 @@ If you can answer these questions, your context management is solid:
 ## 9. Implementation Status
 
 ### Current Status
-**Version**: 1.3.2 (Production Ready) — released 2026-07-13
+**Version**: 1.3.3 (Production Ready) — released 2026-07-13
 - ✅ OpenAI to Vertex AI (Claude) proxy
 - ✅ OpenAI-compatible provider abstraction (`LlmProviderBackend`)
 - ✅ Streaming with intelligent client detection
