@@ -61,6 +61,17 @@ pub trait LlmProviderBackend: std::fmt::Debug + Send + Sync {
 
 /* --- vertex provider ------------------------------------------------------------------------- */
 
+/// Parsed components of a Vertex AI resource URL.
+/// Used to extract structural fields from a `url` override so named model
+/// entries can inherit them without fragile string manipulation.
+#[derive(Debug)]
+struct ParsedVertexUrl {
+    host:      String,
+    project:   String,
+    location:  String,
+    publisher: String,
+}
+
 ///
 /// Vertex AI provider: supports full URL override or VERTEX_* structure.
 #[derive(Debug, Clone)]
@@ -352,6 +363,16 @@ impl LlmProviderBackend for VertexProvider {
 impl VertexProvider {
     /// Build a Vertex AI request URL for a named model entry from `[[vertex.models]]`.
     ///
+    /// Resolution order for each field (project, location, publisher, host):
+    ///   1. Entry has explicit `url` — use it directly, no field resolution needed.
+    ///   2. Entry field is set — use it.
+    ///   3. Parent `[vertex]` field is set — inherit it.
+    ///   4. Parse the parent `[vertex].url` to extract the field.
+    ///   5. Use the standard `{region}-aiplatform.googleapis.com` host pattern.
+    ///
+    /// This means `url` in `[vertex]` is never string-manipulated — it is only
+    /// parsed for structural fields when explicit config values are absent.
+    ///
     /// Returns `None` if no entry with that name exists (caller falls back to the default).
     pub fn build_url_for_named_model(
         name: &str,
@@ -361,90 +382,96 @@ impl VertexProvider {
         let entry = cfg.models.iter().find(|e| e.name.eq_ignore_ascii_case(name))?;
         tracing::debug!("Routing model '{}' via entry '{}' (model={})", name, entry.name, entry.model);
 
-        let resource_url = if let Some(ref url) = entry.url {
-            // Entry has its own explicit URL — use it directly.
-            Self::strip_predict_method_suffix(url.trim())
-        } else if entry.region.is_some()
-            || entry.project.is_some()
-            || entry.location.is_some()
-            || entry.publisher.is_some()
+        // 1. Entry has its own explicit URL — use it directly.
+        if let Some(ref url) = entry.url {
+            let base = Self::strip_predict_method_suffix(url.trim());
+            let method = if is_streaming { "streamRawPredict" } else { "rawPredict" };
+            let result = format!("{}:{}", base, method);
+            tracing::debug!("Model '{}' URL (entry.url): {}", name, result);
+            return Some(result);
+        }
+
+        // Parse the parent url (if present) once, to use as fallback for any missing field.
+        let parsed_parent = cfg.url.as_deref().and_then(|u| Self::parse_vertex_url(u.trim()));
+
+        // 2. Resolve each structural field: entry → parent cfg → parsed parent url.
+        let host = parsed_parent.as_ref().map(|p| p.host.as_str());
+        let project = entry.project.as_deref()
+            .or_else(|| cfg.project.as_deref())
+            .or_else(|| parsed_parent.as_ref().map(|p| p.project.as_str()));
+        let location = entry.location.as_deref()
+            .or_else(|| cfg.location.as_deref())
+            .or_else(|| parsed_parent.as_ref().map(|p| p.location.as_str()));
+        let publisher = entry.publisher.as_deref()
+            .or_else(|| cfg.publisher.as_deref())
+            .or_else(|| parsed_parent.as_ref().map(|p| p.publisher.as_str()));
+        let model_id = entry.model.trim();
+
+        // 3. Build the URL.
+        // Host: use parsed parent URL host, OR fall back to {region}-aiplatform pattern.
+        let resource_url = if let (Some(h), Some(proj), Some(loc), Some(pub_)) =
+            (host, project, location, publisher)
         {
-            // Entry overrides at least one structural field (publisher, region, etc.).
-            // Rebuild the full URL from parts; unset fields inherit from the parent [vertex] block.
-            let region = entry
-                .region
-                .as_deref()
-                .or_else(|| cfg.region.as_deref())
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            let project = entry
-                .project
-                .as_deref()
-                .or_else(|| cfg.project.as_deref())
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            let location = entry
-                .location
-                .as_deref()
-                .or_else(|| cfg.location.as_deref())
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            let publisher = entry
-                .publisher
-                .as_deref()
-                .or_else(|| cfg.publisher.as_deref())
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            let model_id = entry.model.trim().to_string();
-
-            if region.is_empty() || project.is_empty() || location.is_empty() || publisher.is_empty() || model_id.is_empty() {
-                tracing::warn!(
-                    "Model entry '{}' is missing required fields (region/project/location/publisher/model); \
-                     falling back to default model",
-                    name
-                );
-                return None;
-            }
-
             format!(
-                "https://{}-aiplatform.googleapis.com/v1/projects/{}/locations/{}/publishers/{}/models/{}",
-                region, project, location, publisher, model_id
+                "https://{}/v1/projects/{}/locations/{}/publishers/{}/models/{}",
+                h, proj, loc, pub_, model_id
             )
-        } else if let Some(ref parent_url) = cfg.url {
-            // No structural overrides and no per-entry URL, but the parent [vertex] block
-            // has a url override. Reuse the parent URL, swapping only the model ID at the end.
-            let base = Self::strip_predict_method_suffix(parent_url.trim());
-            let prefix = base.rfind('/').map(|i| &base[..=i]).unwrap_or(&base);
-            format!("{}{}", prefix, entry.model.trim())
         } else {
-            // No URL anywhere — build from parent fields + entry model ID.
-            let region = cfg.region.as_deref().unwrap_or("").trim().to_string();
-            let project = cfg.project.as_deref().unwrap_or("").trim().to_string();
-            let location = cfg.location.as_deref().unwrap_or("").trim().to_string();
-            let publisher = cfg.publisher.as_deref().unwrap_or("").trim().to_string();
-            let model_id = entry.model.trim().to_string();
+            // No parent URL to parse host from — fall back to region-based host.
+            let region = entry.region.as_deref()
+                .or_else(|| cfg.region.as_deref())
+                .unwrap_or("").trim();
+            let proj = project.unwrap_or("");
+            let loc  = location.unwrap_or("");
+            let pub_ = publisher.unwrap_or("");
 
-            if region.is_empty() || project.is_empty() || location.is_empty() || publisher.is_empty() || model_id.is_empty() {
+            if region.is_empty() || proj.is_empty() || loc.is_empty() || pub_.is_empty() || model_id.is_empty() {
                 tracing::warn!(
-                    "Model entry '{}' is missing required fields (region/project/location/publisher/model); \
-                     falling back to default model",
+                    "Model entry '{}' is missing required fields; falling back to default model",
                     name
                 );
                 return None;
             }
-
             format!(
                 "https://{}-aiplatform.googleapis.com/v1/projects/{}/locations/{}/publishers/{}/models/{}",
-                region, project, location, publisher, model_id
+                region, proj, loc, pub_, model_id
             )
         };
 
         let method = if is_streaming { "streamRawPredict" } else { "rawPredict" };
-        Some(format!("{}:{}", resource_url, method))
+        let result = format!("{}:{}", resource_url, method);
+        tracing::debug!("Model '{}' URL (built from parts): {}", name, result);
+        Some(result)
+    }
+
+    /// Parse a Vertex AI resource URL into its structural components.
+    ///
+    /// Expects the form:
+    ///   `https://<host>/v1/projects/<project>/locations/<location>/publishers/<publisher>/models/<model>`
+    ///
+    /// Returns `None` if the URL does not match the expected structure.
+    fn parse_vertex_url(url: &str) -> Option<ParsedVertexUrl> {
+        // Strip trailing :rawPredict / :streamRawPredict if present.
+        let url = Self::strip_predict_method_suffix(url);
+        // Strip scheme.
+        let rest = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
+        // Split host from path.
+        let slash = rest.find('/')?;
+        let host = rest[..slash].to_string();
+        let path = &rest[slash..];
+        // Parse /v1/projects/{project}/locations/{location}/publishers/{publisher}/models/{model}
+        let mut parts = path.split('/');
+        // parts: ["", "v1", "projects", proj, "locations", loc, "publishers", pub, "models", model]
+        let _empty   = parts.next()?; // ""
+        let _v1      = parts.next()?; // "v1"
+        let _projects= parts.next()?; // "projects"
+        let project  = parts.next()?.to_string();
+        let _locs    = parts.next()?; // "locations"
+        let location = parts.next()?.to_string();
+        let _pubs    = parts.next()?; // "publishers"
+        let publisher= parts.next()?.to_string();
+        // "models" and model ID are optional for prefix-only URLs
+        Some(ParsedVertexUrl { host, project, location, publisher })
     }
 }
 

@@ -5,6 +5,22 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-07-13
+
+### Fixed
+
+- **Multi-model URL construction is now fully structural** — no more string surgery on the
+  parent `url`. When `[[vertex.models]]` entries need a URL, all fields (host, project,
+  location, publisher) are now resolved by parsing the parent `[vertex].url` into its
+  components, then assembling a clean URL with the entry's model ID. This means:
+  - Non-standard hosts like `aiplatform.googleapis.com` (global region) are preserved correctly.
+  - Model entries with or without `@version` suffixes work regardless of what the parent URL contains.
+  - No more fragile `rfind('/')` or `/models/` substring splits.
+- Added `ParsedVertexUrl` helper struct and `parse_vertex_url()` to extract host/project/
+  location/publisher from any well-formed Vertex AI resource URL.
+
+---
+
 ## [1.3.1] - 2026-07-13
 
 ### Fixed
@@ -419,7 +435,8 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
-- **1.3.1** (2026-07-13): Fix default model URL ignoring `[vertex].url` when individual fields also set; add debug logging for URL resolution
+- **1.3.2** (2026-07-13): Multi-model URL construction fully structural — parse parent `url` into components, no string surgery
+- **1.3.1** (2026-07-13): Fix default model URL ignoring `[vertex].url` when individual fields also set
 - **1.3.0** (2026-07-13): `modelmux logs` command; doctor/validate show model routing; fix multi-model URL resolution
 - **1.2.0** (2026-07-13): Support for multiple models — route requests by model name via `[[vertex.models]]`
 - **1.1.0** (2026-05-23): macOS `~/.config/modelmux/` paths + auto-migration; rotating logs (~30 days retention)
@@ -431,6 +448,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.3.2]: https://github.com/yarenty/modelmux/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/yarenty/modelmux/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/yarenty/modelmux/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/yarenty/modelmux/compare/v1.1.0...v1.2.0
