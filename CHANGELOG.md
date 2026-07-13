@@ -5,6 +5,18 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-07-13
+
+### Added
+
+- **10 URL construction tests** (`tests/url_tests.rs`) proving correct Vertex AI endpoint
+  generation for every scenario: standard region, global region, named model inheritance,
+  multiple named models, publisher override, explicit entry URL, parent URL override,
+  unknown model fallback, end-to-end `Config` routing, and default model via env vars.
+  Run with `cargo test --no-fail-fast --test url_tests`.
+
+---
+
 ## [1.3.4] - 2026-07-13
 
 ### Fixed
@@ -464,6 +476,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
+- **1.3.5** (2026-07-13): 10 URL construction tests proving correct endpoint generation for all routing scenarios
 - **1.3.4** (2026-07-13): `global` region correctly maps to `aiplatform.googleapis.com` in all URL paths
 - **1.3.3** (2026-07-13): Fix root cause of multi-model routing — `build_predict_url_for_model` let-chain fallthrough
 - **1.3.2** (2026-07-13): Multi-model URL construction fully structural — parse parent `url` into components, no string surgery
@@ -479,6 +492,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.3.5]: https://github.com/yarenty/modelmux/compare/v1.3.4...v1.3.5
 [1.3.4]: https://github.com/yarenty/modelmux/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/yarenty/modelmux/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/yarenty/modelmux/compare/v1.3.1...v1.3.2
