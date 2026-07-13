@@ -5,6 +5,21 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-07-13
+
+### Fixed
+
+- **Default model URL ignored `[vertex].url`**: the `if let … && let … &&` chain in
+  `resolve_predict_url_and_model` silently fell through when both `url` and individual
+  fields (`project`, `region`, etc.) were set in `[vertex]`, causing the field-based
+  builder to run and produce an invalid URL (e.g. `https://global-aiplatform.googleapis.com/…`).
+  Rewritten as explicit nested `if let` blocks — `url` now correctly takes priority.
+- **Debug logging**: added `DEBUG`-level log lines showing which URL-resolution branch is
+  taken at startup, and which model entry is matched per request. Run with
+  `log_level = "debug"` to see them.
+
+---
+
 ## [1.3.0] - 2026-07-13
 
 ### Added
@@ -404,7 +419,8 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
-- **1.3.0** (2026-07-13): `modelmux logs` command; doctor/validate show model routing; fix multi-model URL resolution with `url` override and publisher override
+- **1.3.1** (2026-07-13): Fix default model URL ignoring `[vertex].url` when individual fields also set; add debug logging for URL resolution
+- **1.3.0** (2026-07-13): `modelmux logs` command; doctor/validate show model routing; fix multi-model URL resolution
 - **1.2.0** (2026-07-13): Support for multiple models — route requests by model name via `[[vertex.models]]`
 - **1.1.0** (2026-05-23): macOS `~/.config/modelmux/` paths + auto-migration; rotating logs (~30 days retention)
 - **1.0.0** (2026-02-17): Brew services, systemd daemon, .deb packaging, Linux release
@@ -415,6 +431,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.3.1]: https://github.com/yarenty/modelmux/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/yarenty/modelmux/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/yarenty/modelmux/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/yarenty/modelmux/compare/v1.0.0...v1.1.0

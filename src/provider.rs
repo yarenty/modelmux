@@ -116,33 +116,43 @@ impl VertexProvider {
     }
 
     fn resolve_predict_url_and_model(vertex_config: Option<&VertexConfig>) -> Result<(String, String)> {
-        // 1. Check config file URL override
-        if let Some(cfg) = vertex_config
-            && let Some(ref url) = cfg.url
-                && !url.trim().is_empty() {
-                    let resource_url = Self::strip_predict_method_suffix(url.trim());
+        // 1. Config file URL override — highest priority
+        if let Some(cfg) = vertex_config {
+            if let Some(ref url) = cfg.url {
+                let trimmed = url.trim();
+                if !trimmed.is_empty() {
+                    tracing::debug!("Using config file url override: {}", trimmed);
+                    let resource_url = Self::strip_predict_method_suffix(trimmed);
                     let display = Self::get_model_display_name_from_config_or_env(cfg)?;
                     return Ok((resource_url, display));
                 }
+            }
+        }
 
-        // 2. Check env var LLM_URL
-        if let Ok(url) = env::var("LLM_URL")
-            && !url.trim().is_empty() {
-                let resource_url = Self::strip_predict_method_suffix(url.trim());
+        // 2. Env var LLM_URL override
+        if let Ok(url) = env::var("LLM_URL") {
+            let trimmed = url.trim().to_string();
+            if !trimmed.is_empty() {
+                tracing::debug!("Using LLM_URL env var: {}", trimmed);
+                let resource_url = Self::strip_predict_method_suffix(&trimmed);
                 let display = Self::get_model_display_name_override()?;
                 return Ok((resource_url, display));
             }
+        }
 
-        // 3. Check config file vertex fields
-        if let Some(cfg) = vertex_config
-            && Self::has_vertex_config(cfg) {
+        // 3. Config file vertex fields
+        if let Some(cfg) = vertex_config {
+            if Self::has_vertex_config(cfg) {
+                tracing::debug!("Using config file vertex fields");
                 let resource_url = Self::build_vertex_resource_url_from_config(cfg)?;
                 let display = Self::get_model_display_name_from_config_or_env(cfg)?;
                 return Ok((resource_url, display));
             }
+        }
 
-        // 4. Check env vars
+        // 4. Environment variables
         if Self::has_vertex_vars() {
+            tracing::debug!("Using VERTEX_* environment variables");
             let resource_url = Self::build_vertex_resource_url()?;
             let display = Self::get_model_display_name_vertex()?;
             return Ok((resource_url, display));
@@ -349,6 +359,7 @@ impl VertexProvider {
         is_streaming: bool,
     ) -> Option<String> {
         let entry = cfg.models.iter().find(|e| e.name.eq_ignore_ascii_case(name))?;
+        tracing::debug!("Routing model '{}' via entry '{}' (model={})", name, entry.name, entry.model);
 
         let resource_url = if let Some(ref url) = entry.url {
             // Entry has its own explicit URL — use it directly.
