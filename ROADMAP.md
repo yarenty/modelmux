@@ -37,12 +37,13 @@ Sane defaults, predictable config, no vendor lock-in.
 
 ---
 
-## Current Status: v1.1.0
+## Current Status: v1.2.0
 
 ✅ **Production-ready, predictable, easy to configure**
 
 - OpenAI → Vertex AI (Anthropic Claude) proxy with streaming and tool calling
 - Smart client detection (IDEs / browsers / CLI) and three streaming modes (auto / standard / buffered / never / always)
+- **Multi-model routing**: clients pick a model by name; the proxy routes to the correct Vertex AI endpoint
 - Rust Edition 2024 with comprehensive type-safe error handling
 - CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`
 - TOML configuration with multi-layered hierarchy (CLI > env > user > system > defaults)

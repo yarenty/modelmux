@@ -391,11 +391,12 @@ If you can answer these questions, your context management is solid:
 ## 9. Implementation Status
 
 ### Current Status
-**Version**: 1.1.0 (Production Ready) — released 2026-05-23
+**Version**: 1.2.0 (Production Ready) — released 2026-07-13
 - ✅ OpenAI to Vertex AI (Claude) proxy
 - ✅ OpenAI-compatible provider abstraction (`LlmProviderBackend`)
 - ✅ Streaming with intelligent client detection
 - ✅ Tool/function calling support
+- ✅ **Multi-model routing**: clients select a model by name; proxy routes to the correct Vertex AI endpoint via `[[vertex.models]]` config
 - ✅ Rust Edition 2024 with type safety
 - ✅ Comprehensive error handling
 - ✅ CLI: `--version`, `--help`, `config {init,show,validate,edit}`, `doctor`, `validate`

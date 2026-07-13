@@ -226,7 +226,8 @@ async fn process_chat_completion(
         tracing::debug!("Using goose-compatible mode (non-streaming SSE)");
         let openai_request = parse_openai_request(request)?;
         log_incoming_request(&state, &openai_request);
-        return handle_goose_request(state, openai_request).await;
+        let requested_model = openai_request.model.clone();
+        return handle_goose_request(state, openai_request, requested_model.as_deref()).await;
     }
 
     // Determine streaming behavior based on configuration and client detection
@@ -248,10 +249,11 @@ async fn process_chat_completion(
     let openai_request = parse_openai_request(request)?;
     log_incoming_request(&state, &openai_request);
 
+    let requested_model = openai_request.model.clone();
     let anthropic_request = convert_to_anthropic(state.clone(), openai_request)?;
     let auth_header = get_authorization_header(state.clone()).await?;
     let vertex_response =
-        make_vertex_request_with_retry(state.clone(), &anthropic_request, &auth_header).await?;
+        make_vertex_request_with_retry(state.clone(), &anthropic_request, &auth_header, requested_model.as_deref()).await?;
 
     if anthropic_request.stream {
         if should_use_buffered_streaming {
@@ -347,16 +349,17 @@ async fn make_vertex_request_with_retry(
     state: Arc<AppState>,
     anthropic_request: &crate::converter::openai_to_anthropic::AnthropicRequest,
     auth_header: &str,
+    requested_model: Option<&str>,
 ) -> Result<reqwest::Response> {
     if !state.config.server.enable_retries {
-        return make_vertex_request(state, anthropic_request, auth_header).await;
+        return make_vertex_request(state, anthropic_request, auth_header, requested_model).await;
     }
 
     let mut attempts = 0;
 
     loop {
         attempts += 1;
-        let response = make_vertex_request(state.clone(), anthropic_request, auth_header).await;
+        let response = make_vertex_request(state.clone(), anthropic_request, auth_header, requested_model).await;
 
         match response {
             Ok(resp) => return Ok(resp),
@@ -400,8 +403,10 @@ async fn make_vertex_request(
     state: Arc<AppState>,
     anthropic_request: &crate::converter::openai_to_anthropic::AnthropicRequest,
     auth_header: &str,
+    requested_model: Option<&str>,
 ) -> Result<reqwest::Response> {
-    let url = state.config.build_predict_url(anthropic_request.stream);
+    let url = state.config.build_predict_url_for_model(requested_model, anthropic_request.stream);
+    tracing::debug!("Sending request to Vertex AI: {}", url);
 
     let response = state
         .http_client
@@ -992,6 +997,7 @@ async fn send_buffered_text(
 async fn handle_goose_request(
     state: Arc<AppState>,
     openai_request: crate::converter::openai_to_anthropic::OpenAiRequest,
+    requested_model: Option<&str>,
 ) -> Result<axum::response::Response> {
     // Convert to Anthropic format
     let anthropic_request = state.openai_to_anthropic.convert(openai_request)?;
@@ -1007,6 +1013,7 @@ async fn handle_goose_request(
         state.clone(),
         &anthropic_request_non_streaming,
         &auth_header,
+        requested_model,
     )
     .await?;
 
@@ -1299,14 +1306,23 @@ fn create_error_response(error: &ProxyError) -> axum::response::Response {
 /// # Returns
 ///  * JSON response with model list
 pub async fn models(State(state): State<Arc<AppState>>) -> Json<Value> {
+    let now = chrono::Utc::now().timestamp_millis();
+    let model_list: Vec<Value> = state
+        .config
+        .list_model_names()
+        .into_iter()
+        .map(|name| {
+            json!({
+                "id": name,
+                "object": "model",
+                "created": now,
+                "owned_by": "anthropic"
+            })
+        })
+        .collect();
     Json(json!({
       "object": "list",
-      "data": [{
-        "id": state.config.llm_model(),
-        "object": "model",
-        "created": chrono::Utc::now().timestamp_millis(),
-        "owned_by": "anthropic"
-      }]
+      "data": model_list
     }))
 }
 

@@ -339,6 +339,71 @@ impl LlmProviderBackend for VertexProvider {
     }
 }
 
+impl VertexProvider {
+    /// Build a Vertex AI request URL for a named model entry from `[[vertex.models]]`.
+    ///
+    /// Returns `None` if no entry with that name exists (caller falls back to the default).
+    pub fn build_url_for_named_model(
+        name: &str,
+        cfg: &VertexConfig,
+        is_streaming: bool,
+    ) -> Option<String> {
+        let entry = cfg.models.iter().find(|e| e.name.eq_ignore_ascii_case(name))?;
+
+        let resource_url = if let Some(ref url) = entry.url {
+            Self::strip_predict_method_suffix(url.trim())
+        } else {
+            // Resolve each field: entry override > parent cfg > error
+            let region = entry
+                .region
+                .as_deref()
+                .or_else(|| cfg.region.as_deref())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let project = entry
+                .project
+                .as_deref()
+                .or_else(|| cfg.project.as_deref())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let location = entry
+                .location
+                .as_deref()
+                .or_else(|| cfg.location.as_deref())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let publisher = entry
+                .publisher
+                .as_deref()
+                .or_else(|| cfg.publisher.as_deref())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let model_id = entry.model.trim().to_string();
+
+            if region.is_empty() || project.is_empty() || location.is_empty() || publisher.is_empty() || model_id.is_empty() {
+                tracing::warn!(
+                    "Model entry '{}' is missing required fields (region/project/location/publisher/model); \
+                     falling back to default model",
+                    name
+                );
+                return None;
+            }
+
+            format!(
+                "https://{}-aiplatform.googleapis.com/v1/projects/{}/locations/{}/publishers/{}/models/{}",
+                region, project, location, publisher, model_id
+            )
+        };
+
+        let method = if is_streaming { "streamRawPredict" } else { "rawPredict" };
+        Some(format!("{}:{}", resource_url, method))
+    }
+}
+
 /* --- openai-compatible provider (stub) ------------------------------------------------------- */
 
 ///

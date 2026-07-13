@@ -5,30 +5,96 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-02-17
+## [1.2.0] - 2026-07-13
 
 ### Added
 
-#### Service Management
-- **Homebrew services**: Run as a background service with `brew services start modelmux` (macOS)
-- **systemd support**: Linux daemon with system and user service units
-  - `packaging/systemd/modelmux.service` — system-wide service
-  - `packaging/systemd/modelmux-user.service` — per-user service
-  - Documentation in `packaging/systemd/README.md`
+- **Multi-model routing**: configure multiple Vertex AI models under `[[vertex.models]]`;
+  clients select a model by name via the `"model"` field in their OpenAI request.
+  Unset fields on each entry inherit from the parent `[vertex]` block (project, region,
+  location, publisher) — only `name` and `model` are required per entry.
+- **`/v1/models` lists all configured models** — previously returned only the default model.
+- **`publisher` override per model entry** — each `[[vertex.models]]` entry can specify its
+  own `publisher`, `region`, `project`, `location`, or `url` when routing to a different
+  backend than the default.
 
-#### Linux / Ubuntu Packaging
-- **Debian packages (.deb)**: Build for amd64 and arm64 with `cargo-deb`
-- **systemd integration**: .deb packages include systemd unit and auto-enable on install
-- **Release workflow**: GitHub Actions builds .deb alongside binaries on tag push
-- **`packaging/release-linux.sh`**: Local .deb build script for testing
+### Example config
 
-### Changed
+```toml
+[vertex]
+project   = "my-project"
+region    = "europe-west1"
+location  = "europe-west1"
+publisher = "anthropic"
+model     = "claude-sonnet-4@20250514"
 
-- **Version**: 1.0.0 — production-ready milestone
+[[vertex.models]]
+name  = "claude-opus"
+model = "claude-opus-4@20250514"
+
+[[vertex.models]]
+name  = "claude-sonnet"
+model = "claude-sonnet-4@20250514"
+```
 
 ---
 
-## [0.6.0] - 2026-02-14
+## [1.1.0] - 2026-05-23
+
+### Changed
+
+#### Predictable macOS Configuration Paths
+- **`~/.config/modelmux/` on macOS too**: ModelMux now stores its configuration
+  under `~/.config/modelmux/` on macOS (XDG-style), matching Linux. No more
+  hunting through `~/Library/Application Support/com.SkyCorp.modelmux/`.
+- **New defaults on macOS**:
+  - Config: `~/.config/modelmux/config.toml`
+  - Service account: `~/.config/modelmux/service-account.json`
+  - Cache: `~/.cache/modelmux/`
+  - Data: `~/.local/share/modelmux/`
+- **System-wide config on macOS** moved from `/Library/Preferences/modelmux/`
+  to `/etc/modelmux/`, for consistency with Linux.
+- Linux and Windows defaults are unchanged.
+
+### Added
+
+#### Automatic, Idempotent macOS Config Migration
+- On startup, ModelMux now auto-migrates any existing configuration from the
+  legacy `~/Library/Application Support/com.SkyCorp.modelmux/` (or
+  `…/modelmux/`) into `~/.config/modelmux/`:
+  - **Idempotent**: short-circuits once `~/.config/modelmux/config.toml`
+    exists; safe to call on every startup.
+  - **Non-destructive**: never overwrites a file that already exists in the
+    new location. Conflicting files stay at the legacy path and the user is
+    told about them once.
+  - **Path-aware**: rewrites absolute references to the legacy directory
+    inside `config.toml` (e.g. `service_account_file = ".../Library/Application
+    Support/com.SkyCorp.modelmux/service-account.json"`) so configs keep
+    working without manual editing.
+  - **Best-effort cleanup**: empties and removes the legacy directory once
+    everything has been moved.
+- The migration prints a single, clear stderr report on the run that performs
+  the move and is silent on every subsequent run.
+- Implementation lives in `src/config/migration.rs`, covered by unit tests
+  for the success path, idempotent no-op, no-clobber behaviour, and the
+  empty-legacy case.
+
+#### Rotating log files
+- **Rotating log files** via `tracing-appender`. Logs go to stdout AND to a
+  daily-rotating file in the OS-conventional per-user log directory
+  (`~/Library/Logs/modelmux/` on macOS, `~/.local/state/modelmux/` on Linux
+  per XDG `$XDG_STATE_HOME`, `%LOCALAPPDATA%/modelmux/Logs/` on Windows),
+  keeping the last **30 files** (≈ last month). Fixes unbounded log growth
+  under `brew services` — the Homebrew formula no longer redirects stdout to
+  a single growing `var/log/modelmux.log`.
+
+#### Legacy macOS Fallback in the Loader
+- `with_user_config` keeps a safety-net fallback that reads from the legacy
+  macOS path if migration was skipped or failed.
+
+---
+
+## [1.0.0] - 2026-02-17
 
 ### Added
 
@@ -287,94 +353,6 @@ Dual licensed under MIT OR Apache-2.0
 
 ---
 
-## [1.1.0] - 2026-05-23
-
-### Changed
-
-#### Predictable macOS Configuration Paths
-- **`~/.config/modelmux/` on macOS too**: ModelMux now stores its configuration
-  under `~/.config/modelmux/` on macOS (XDG-style), matching Linux. No more
-  hunting through `~/Library/Application Support/com.SkyCorp.modelmux/`.
-- **New defaults on macOS**:
-  - Config: `~/.config/modelmux/config.toml`
-  - Service account: `~/.config/modelmux/service-account.json`
-  - Cache: `~/.cache/modelmux/`
-  - Data: `~/.local/share/modelmux/`
-- **System-wide config on macOS** moved from `/Library/Preferences/modelmux/`
-  to `/etc/modelmux/`, for consistency with Linux.
-- Linux and Windows defaults are unchanged.
-
-### Added
-
-#### Automatic, Idempotent macOS Config Migration
-- On startup, ModelMux now auto-migrates any existing configuration from the
-  legacy `~/Library/Application Support/com.SkyCorp.modelmux/` (or
-  `…/modelmux/`) into `~/.config/modelmux/`:
-  - **Idempotent**: short-circuits once `~/.config/modelmux/config.toml`
-    exists; safe to call on every startup.
-  - **Non-destructive**: never overwrites a file that already exists in the
-    new location. Conflicting files stay at the legacy path and the user is
-    told about them once.
-  - **Path-aware**: rewrites absolute references to the legacy directory
-    inside `config.toml` (e.g. `service_account_file = ".../Library/Application
-    Support/com.SkyCorp.modelmux/service-account.json"`) so configs keep
-    working without manual editing.
-  - **Best-effort cleanup**: empties and removes the legacy directory once
-    everything has been moved.
-- The migration prints a single, clear stderr report on the run that performs
-  the move and is silent on every subsequent run.
-- Implementation lives in `src/config/migration.rs`, covered by unit tests
-  for the success path, idempotent no-op, no-clobber behaviour, and the
-  empty-legacy case.
-
-#### Rotating log files
-- **Rotating log files** via `tracing-appender`. Logs go to stdout AND to a
-  daily-rotating file in the OS-conventional per-user log directory
-  (`~/Library/Logs/modelmux/` on macOS, `~/.local/state/modelmux/` on Linux
-  per XDG `$XDG_STATE_HOME`, `%LOCALAPPDATA%/modelmux/Logs/` on Windows),
-  keeping the last **30 files** (≈ last month). Fixes unbounded log growth
-  under `brew services` — the Homebrew formula no longer redirects stdout to
-  a single growing `var/log/modelmux.log`.
-
-  Cleanup for a pre-existing multi-GB log:
-
-  ```bash
-  brew services stop modelmux
-  rm -f "$(brew --prefix)"/var/log/modelmux.log*
-  brew services start modelmux
-  ```
-
-#### Legacy macOS Fallback in the Loader
-- `with_user_config` keeps a safety-net fallback that reads from the legacy
-  macOS path if migration was skipped or failed. The fallback emits both a
-  `tracing::warn!` and an `eprintln!` migration hint so users see the message
-  even during CLI subcommands (which run before logging is initialised).
-
-### Migration
-
-No manual steps required for most users — just upgrade and run `modelmux`.
-The first run on macOS will print:
-
-```
-✅ ModelMux: migrated configuration to XDG-style macOS location
-   New location: /Users/you/.config/modelmux
-   Migrated from: /Users/you/Library/Application Support/com.SkyCorp.modelmux
-   Moved files:
-     - config.toml
-     - service-account.json
-   Rewrote absolute paths in config.toml to point at the new location.
-```
-
-If you'd rather migrate by hand:
-
-```bash
-mkdir -p "$HOME/.config/modelmux"
-mv "$HOME/Library/Application Support/com.SkyCorp.modelmux"/* "$HOME/.config/modelmux/"
-rmdir "$HOME/Library/Application Support/com.SkyCorp.modelmux" 2>/dev/null || true
-```
-
----
-
 ## [Unreleased]
 
 ### Planned Features
@@ -392,6 +370,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 
 ## Version History
 
+- **1.2.0** (2026-07-13): Support for multiple models — route requests by model name via `[[vertex.models]]`
 - **1.1.0** (2026-05-23): macOS `~/.config/modelmux/` paths + auto-migration; rotating logs (~30 days retention)
 - **1.0.0** (2026-02-17): Brew services, systemd daemon, .deb packaging, Linux release
 - **0.6.0** (2026-02-14): Professional configuration system, TOML, CLI management
@@ -401,6 +380,7 @@ See [ROADMAP.md](ROADMAP.md) for detailed future plans.
 - **0.2.0** (2026-02-10): CLI interface, comprehensive tests, Homebrew deployment readiness
 - **0.1.0** (2024): Initial production release with core proxy functionality
 
+[1.2.0]: https://github.com/yarenty/modelmux/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/yarenty/modelmux/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/yarenty/modelmux/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/yarenty/modelmux/compare/v0.5.0...v0.6.0

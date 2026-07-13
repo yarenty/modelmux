@@ -61,6 +61,35 @@ pub struct Config {
 }
 
 ///
+/// A single named model entry within the `[vertex]` configuration block.
+///
+/// Used in `[[vertex.models]]` to define multiple routable models.
+/// The `name` field is the OpenAI-facing model alias clients use in `"model": "..."` requests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VertexModelEntry {
+    /// OpenAI-facing alias (e.g. "claude-opus", "claude-sonnet")
+    pub name: String,
+    /// Vertex model ID (e.g. claude-opus-4@20250514)
+    #[serde(alias = "model_id")]
+    pub model: String,
+    /// GCP project ID (inherits from parent [vertex] if omitted)
+    #[serde(default)]
+    pub project: Option<String>,
+    /// Vertex region (inherits from parent [vertex] if omitted)
+    #[serde(default)]
+    pub region: Option<String>,
+    /// Vertex location (inherits from parent [vertex] if omitted)
+    #[serde(default)]
+    pub location: Option<String>,
+    /// Model publisher (inherits from parent [vertex] if omitted)
+    #[serde(default)]
+    pub publisher: Option<String>,
+    /// Full URL override — skips region/project/location/publisher/model construction
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+///
 /// Vertex AI provider configuration.
 ///
 /// Can be set in TOML under `[vertex]` or via environment variables
@@ -79,12 +108,16 @@ pub struct VertexConfig {
     /// Model publisher (e.g. anthropic)
     #[serde(default)]
     pub publisher: Option<String>,
-    /// Model ID (e.g. claude-3-5-sonnet@20241022)
+    /// Model ID (e.g. claude-3-5-sonnet@20241022) — used as the default model
     #[serde(alias = "model_id")]
     pub model: Option<String>,
     /// Full URL override (alternative to region/project/location/publisher/model)
     #[serde(default)]
     pub url: Option<String>,
+    /// Additional named models that clients can request by name.
+    /// Each entry may override individual fields; unset fields inherit from the parent [vertex] block.
+    #[serde(default)]
+    pub models: Vec<VertexModelEntry>,
 }
 
 ///
@@ -372,6 +405,42 @@ impl Config {
             .unwrap_or_else(|| "http://localhost:3000/unknown".to_string())
     }
 
+    /// Build the Vertex AI request URL for a specific model name.
+    ///
+    /// Looks up the model in `[vertex.models]` by name (case-insensitive). Falls back to
+    /// the default provider URL if the name is not found or is empty.
+    pub fn build_predict_url_for_model(&self, model_name: Option<&str>, is_streaming: bool) -> String {
+        if let Some(name) = model_name
+            && !name.is_empty()
+            && let Some(LlmProviderConfig::Vertex(_)) = self.llm_provider.as_ref()
+            && let Some(vertex_cfg) = self.vertex.as_ref()
+        {
+            if let Some(url) =
+                crate::provider::VertexProvider::build_url_for_named_model(name, vertex_cfg, is_streaming)
+            {
+                return url;
+            }
+        }
+        self.build_predict_url(is_streaming)
+    }
+
+    /// Return the OpenAI-facing model names for all configured models.
+    ///
+    /// Always contains at least the default model. Named entries from `[[vertex.models]]`
+    /// are appended in declaration order.
+    pub fn list_model_names(&self) -> Vec<String> {
+        let default = self.llm_model().to_string();
+        let mut names = vec![default];
+        if let Some(vertex_cfg) = self.vertex.as_ref() {
+            for entry in &vertex_cfg.models {
+                if !names.contains(&entry.name) {
+                    names.push(entry.name.clone());
+                }
+            }
+        }
+        names
+    }
+
     /// Display model name for OpenAI-compatible API responses
     pub fn llm_model(&self) -> &str {
         self.llm_provider.as_ref().map(|p| p.display_model_name()).unwrap_or("unknown")
@@ -539,6 +608,16 @@ publisher = "anthropic"
 model = "claude-3-5-sonnet@20241022"
 # Or use full URL override instead:
 # url = "https://europe-west1-aiplatform.googleapis.com/v1/projects/MY_PROJECT/locations/europe-west1/publishers/anthropic/models/claude-3-5-sonnet@20241022"
+
+# Optional: add extra models that clients can request by name.
+# Fields not set here inherit from the [vertex] block above.
+# [[vertex.models]]
+# name = "claude-opus"          # alias clients use in "model": "claude-opus"
+# model = "claude-opus-4@20250514"
+#
+# [[vertex.models]]
+# name = "claude-sonnet"
+# model = "claude-sonnet-4@20250514"
 
 # Alternative: use environment variables (including from .env file):
 # LLM_PROVIDER=vertex
