@@ -5,7 +5,25 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.6] - 2026-11-17
+
+### Added
+
+- **`POST /v1/messages`, a pass-through.** The Anthropic Messages API, sent to Vertex AI as
+  the client wrote it. Only what Vertex needs differs: `model` picks the endpoint and
+  `anthropic_version` is added when missing. Nothing is added, changed or dropped, and the
+  model's status and body (JSON or event stream) come back as they are.
+- **More chat fields reach the model.** `/v1/chat/completions` now sends `top_p`, `stop`,
+  `user` and `max_completion_tokens`, and passes any field it does not know through unchanged
+  (`thinking`, `top_k`, ...). OpenAI fields with no Anthropic counterpart are dropped and
+  named in a warning; before, every field outside a list of seven was dropped silently.
+- **`[vertex] max_tokens`.** The output limit for chat requests that give none. The API
+  requires the field, so it cannot be left out; it stays 8000 when not set.
+
+### Changed
+
+- A request the model refuses now returns status 400 with the model's own message, instead
+  of 500 "Bad request format."
 
 ### Fixed
 

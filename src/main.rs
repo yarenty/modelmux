@@ -721,6 +721,7 @@ async fn create_app_state(config: Config) -> Result<Arc<AppState>> {
 fn create_router(app_state: Arc<AppState>) -> Router {
     Router::new()
         .route("/v1/chat/completions", post(server::chat_completions))
+        .route("/v1/messages", post(server::messages))
         .route("/v1/models", get(server::models))
         .route("/health", get(server::health))
         .layer(CorsLayer::permissive())
@@ -807,6 +808,7 @@ fn log_startup_info(config: &Config) {
     info!("ModelMux v{} running on port {}", VERSION, config.server.port);
     info!("Proxy supports tool/function calling for file creation and editing");
     info!("OpenAI-compatible endpoint: http://localhost:{}/v1", config.server.port);
+    info!("Anthropic Messages pass-through: http://localhost:{}/v1/messages", config.server.port);
 
     if matches!(
         config.server.log_level,

@@ -163,6 +163,7 @@ region = "{your-region}"
 location = "{your-region}"
 publisher = "anthropic"
 model = "{your-model}"
+# max_tokens = 8000   # output limit for chat requests that give none
 
 [streaming]
 mode = "auto"  # auto, never, standard, buffered, always
@@ -327,6 +328,35 @@ POST /v1/chat/completions
 ```
 
 OpenAI-compatible chat completions with full tool calling support.
+
+What is sent on to the model:
+
+- `messages`, `tools`, `tool_choice` and `stream` are translated to the Anthropic format.
+- `temperature`, `top_p`, `stop` and `user` are sent only when the request has them.
+- `max_tokens` (or `max_completion_tokens`) is sent as given. The Anthropic API refuses a
+  request without it, so a request that has none gets `[vertex] max_tokens` from the config,
+  or 8000 when that is not set.
+- Any other field goes through unchanged, so Anthropic's own fields such as `thinking` or
+  `top_k` work. OpenAI fields with no Anthropic counterpart (`n`, `seed`, `logprobs`,
+  `frequency_penalty`, `presence_penalty`, `logit_bias`, `response_format` and the like) are
+  dropped and named in a warning in the log.
+
+### Messages (pass-through)
+```
+POST /v1/messages
+```
+
+The Anthropic Messages API, passed to Vertex AI as you send it. ModelMux only does what
+Vertex needs: `model` picks the endpoint (a name from `[[vertex.models]]`, else the default
+model) and `anthropic_version` is added when missing. No field is added, changed or dropped,
+and the model's status and body, JSON or event stream, come back as they are. An
+`anthropic-beta` header is passed on.
+
+```bash
+curl -X POST http://localhost:3000/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-opus", "max_tokens": 1024, "messages": [{"role": "user", "content": "Hello"}]}'
+```
 
 ### Models
 ```

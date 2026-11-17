@@ -89,6 +89,7 @@ pub async fn create_app(config: Config) -> Result<axum::Router, ProxyError> {
 
     Ok(Router::new()
         .route("/v1/chat/completions", post(server::chat_completions))
+        .route("/v1/messages", post(server::messages))
         .route("/v1/models", get(server::models))
         .route("/health", get(server::health))
         .layer(CorsLayer::permissive())

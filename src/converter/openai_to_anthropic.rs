@@ -60,6 +60,28 @@ pub struct OpenAiRequest {
     pub tools: Option<Vec<OpenAiTool>>,
     /** tool choice configuration */
     pub tool_choice: Option<OpenAiToolChoice>,
+    /** newer OpenAI name for `max_tokens`; used when `max_tokens` is absent */
+    pub max_completion_tokens: Option<u32>,
+    /** nucleus sampling */
+    pub top_p: Option<f64>,
+    /** one stop sequence or a list of them */
+    pub stop: Option<OpenAiStop>,
+    /** end-user identifier */
+    pub user: Option<String>,
+    /** every other top-level field the client sent */
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+///
+/// OpenAI `stop`: a single sequence or a list.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum OpenAiStop {
+    /** one stop sequence */
+    One(String),
+    /** several stop sequences */
+    Many(Vec<String>),
 }
 
 ///
@@ -232,6 +254,15 @@ pub struct AnthropicRequest {
     /** sampling temperature; left out when the caller sent none, so the model's own default applies */
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f64>,
+    /** nucleus sampling, when the caller sent it */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+    /** stop sequences, when the caller sent any */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop_sequences: Option<Vec<String>>,
+    /** request metadata (`user_id`), when the caller sent a `user` */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
     /** whether to stream the response */
     pub stream: bool,
     /** available tools in Anthropic format */
@@ -240,6 +271,9 @@ pub struct AnthropicRequest {
     /** tool choice configuration in Anthropic format */
     #[serde(rename = "tool_choice", skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<AnthropicToolChoice>,
+    /** fields modelmux does not know, passed on as the caller sent them */
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 ///
@@ -363,15 +397,50 @@ pub enum AnthropicToolChoice {
 pub struct OpenAiToAnthropicConverter {
     /** logging level for debug output */
     log_level: LogLevel,
+    /** `max_tokens` sent when the caller gives none */
+    default_max_tokens: u32,
 }
 
 /* --- constants ------------------------------------------------------------------------------ */
 
 /** Anthropic API version to use for requests */
-const ANTHROPIC_VERSION: &str = "vertex-2023-10-16";
+pub const ANTHROPIC_VERSION: &str = "vertex-2023-10-16";
 
-/** Default maximum tokens if not specified */
-const DEFAULT_MAX_TOKENS: u32 = 8000;
+/**
+ * Maximum tokens when neither the caller nor the configuration gives one. The Anthropic API
+ * refuses a request without `max_tokens`, so some value has to be sent.
+ */
+pub const DEFAULT_MAX_TOKENS: u32 = 8000;
+
+/**
+ * OpenAI chat fields with no Anthropic counterpart. They are dropped; any other field modelmux
+ * does not know is passed on unchanged.
+ */
+const OPENAI_ONLY_FIELDS: &[&str] = &[
+    "audio",
+    "frequency_penalty",
+    "function_call",
+    "functions",
+    "logit_bias",
+    "logprobs",
+    "metadata",
+    "modalities",
+    "n",
+    "parallel_tool_calls",
+    "prediction",
+    "presence_penalty",
+    "prompt_cache_key",
+    "reasoning_effort",
+    "response_format",
+    "safety_identifier",
+    "seed",
+    "service_tier",
+    "store",
+    "stream_options",
+    "top_logprobs",
+    "verbosity",
+    "web_search_options",
+];
 
 /* --- start of code -------------------------------------------------------------------------- */
 
@@ -385,7 +454,20 @@ impl OpenAiToAnthropicConverter {
     /// # Returns
     ///  * New converter instance
     pub fn new(log_level: LogLevel) -> Self {
-        Self { log_level }
+        Self { log_level, default_max_tokens: DEFAULT_MAX_TOKENS }
+    }
+
+    ///
+    /// Set the `max_tokens` sent when the caller gives none.
+    ///
+    /// # Arguments
+    ///  * `max_tokens` - fallback output limit
+    ///
+    /// # Returns
+    ///  * The converter with that fallback
+    pub fn with_default_max_tokens(mut self, max_tokens: u32) -> Self {
+        self.default_max_tokens = max_tokens;
+        self
     }
 
     ///
@@ -430,15 +512,26 @@ impl OpenAiToAnthropicConverter {
 
         let tools = self.convert_tools(request.tools);
         let tool_choice = self.convert_tool_choice(request.tool_choice);
+        let extra = Self::passed_on_fields(request.extra);
 
         let anthropic_request = AnthropicRequest {
             anthropic_version: ANTHROPIC_VERSION.to_string(),
             messages: anthropic_messages,
-            max_tokens: request.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS),
+            max_tokens: request
+                .max_tokens
+                .or(request.max_completion_tokens)
+                .unwrap_or(self.default_max_tokens),
             temperature: request.temperature,
+            top_p: request.top_p,
+            stop_sequences: request.stop.map(|stop| match stop {
+                OpenAiStop::One(sequence) => vec![sequence],
+                OpenAiStop::Many(sequences) => sequences,
+            }),
+            metadata: request.user.map(|user| json!({ "user_id": user })),
             stream: request.stream.unwrap_or(false),
             tools,
             tool_choice,
+            extra,
         };
 
         self.debug(&format!(
@@ -447,6 +540,35 @@ impl OpenAiToAnthropicConverter {
         ));
 
         Ok(anthropic_request)
+    }
+
+    ///
+    /// Split the fields modelmux does not know into the ones to pass on and the ones to drop.
+    ///
+    /// OpenAI-only fields are dropped with a warning, because Anthropic refuses a request with
+    /// a field it does not know. Everything else (for example `thinking`, `top_k`) goes
+    /// through as the caller sent it.
+    ///
+    /// # Arguments
+    ///  * `extra` - top-level request fields without a typed counterpart
+    ///
+    /// # Returns
+    ///  * The fields to send on
+    fn passed_on_fields(
+        mut extra: serde_json::Map<String, serde_json::Value>,
+    ) -> serde_json::Map<String, serde_json::Value> {
+        let dropped: Vec<String> =
+            extra.keys().filter(|key| OPENAI_ONLY_FIELDS.contains(&key.as_str())).cloned().collect();
+        for key in &dropped {
+            extra.remove(key);
+        }
+        if !dropped.is_empty() {
+            tracing::warn!(
+                "Request fields with no Anthropic counterpart were dropped: {}",
+                dropped.join(", ")
+            );
+        }
+        extra
     }
 
     ///
