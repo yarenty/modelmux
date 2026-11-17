@@ -50,6 +50,7 @@ fn base_cfg(region: &str, project: &str, location: &str, publisher: &str, model:
         publisher: Some(publisher.to_string()),
         model:     Some(model.to_string()),
         url:       None,
+        max_tokens: None,
         models:    vec![],
     }
 }

@@ -114,6 +114,10 @@ pub struct VertexConfig {
     /// Full URL override (alternative to region/project/location/publisher/model)
     #[serde(default)]
     pub url: Option<String>,
+    /// Output limit sent when a chat request gives no `max_tokens` (the API requires one).
+    /// Unset means 8000.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
     /// Additional named models that clients can request by name.
     /// Each entry may override individual fields; unset fields inherit from the parent [vertex] block.
     #[serde(default)]
@@ -608,6 +612,8 @@ region = "europe-west1"
 location = "europe-west1"
 publisher = "anthropic"
 model = "claude-3-5-sonnet@20241022"
+# Output limit for chat requests that give no max_tokens (the API requires one; default 8000):
+# max_tokens = 8000
 # Or use full URL override instead:
 # url = "https://europe-west1-aiplatform.googleapis.com/v1/projects/MY_PROJECT/locations/europe-west1/publishers/anthropic/models/claude-3-5-sonnet@20241022"
 

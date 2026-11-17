@@ -137,7 +137,13 @@ impl AppState {
             None => return Err(ProxyError::Config("LLM provider not configured".to_string())),
         };
         let http_client = Self::create_http_client()?;
-        let openai_to_anthropic = OpenAiToAnthropicConverter::new(config.server.log_level);
+        let default_max_tokens = config
+            .vertex
+            .as_ref()
+            .and_then(|vertex| vertex.max_tokens)
+            .unwrap_or(crate::converter::openai_to_anthropic::DEFAULT_MAX_TOKENS);
+        let openai_to_anthropic = OpenAiToAnthropicConverter::new(config.server.log_level)
+            .with_default_max_tokens(default_max_tokens);
         let anthropic_to_openai = AnthropicToOpenAiConverter::new(config.server.log_level);
         let metrics = AppMetrics::default();
 
@@ -457,7 +463,10 @@ async fn validate_vertex_response(response: reqwest::Response) -> Result<reqwest
                 if error_text.contains("tools: Input should be a valid list") {
                     ProxyError::Conversion("Invalid tools configuration in request.".to_string())
                 } else {
-                    ProxyError::Http("Bad request format.".to_string())
+                    ProxyError::Conversion(format!(
+                        "The model refused the request: {}",
+                        upstream_error_message(&error_text)
+                    ))
                 }
             }
             401 => ProxyError::Auth(
@@ -474,6 +483,152 @@ async fn validate_vertex_response(response: reqwest::Response) -> Result<reqwest
         return Err(client_error);
     }
     Ok(response)
+}
+
+///
+/// The human-readable message inside an upstream error body, or the body itself.
+///
+/// # Arguments
+///  * `error_text` - raw error body from the upstream endpoint
+///
+/// # Returns
+///  * The `error.message` field when the body is JSON with one, else the trimmed body
+fn upstream_error_message(error_text: &str) -> String {
+    serde_json::from_str::<Value>(error_text)
+        .ok()
+        .and_then(|body| body.pointer("/error/message").and_then(Value::as_str).map(str::to_owned))
+        .unwrap_or_else(|| error_text.trim().to_string())
+}
+
+///
+/// Handle the Anthropic Messages endpoint as a pass-through.
+///
+/// The body goes to Vertex AI as the client sent it. Only what Vertex needs differs from the
+/// Anthropic API: `model` selects the endpoint and is taken out of the body, and
+/// `anthropic_version` is added when missing. The upstream status and body (JSON or the event
+/// stream) come back unchanged.
+///
+/// # Arguments
+///  * `state` - shared application state
+///  * `headers` - request headers (`anthropic-beta` is passed on)
+///  * `request` - Anthropic Messages request JSON
+///
+/// # Returns
+///  * The upstream response, or a JSON error when the request never reached the model
+pub async fn messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(request): Json<Value>,
+) -> axum::response::Response {
+    state.metrics.total_requests.fetch_add(1, Ordering::Relaxed);
+
+    match process_messages(state.clone(), request, &headers).await {
+        Ok(response) => {
+            let counter = if response.status().is_success() {
+                &state.metrics.successful_requests
+            } else {
+                &state.metrics.failed_requests
+            };
+            counter.fetch_add(1, Ordering::Relaxed);
+            response
+        }
+        Err(e) => {
+            state.metrics.failed_requests.fetch_add(1, Ordering::Relaxed);
+            create_error_response(&e)
+        }
+    }
+}
+
+///
+/// Prepare a Messages request body for Vertex AI.
+///
+/// # Arguments
+///  * `request` - Anthropic Messages request JSON
+///
+/// # Returns
+///  * The body to send, the requested model name and whether the client asked for a stream
+///  * `ProxyError::Conversion` if the body is not a JSON object
+pub fn prepare_messages_body(mut request: Value) -> Result<(Value, Option<String>, bool)> {
+    let body = request
+        .as_object_mut()
+        .ok_or_else(|| ProxyError::Conversion("The request body must be a JSON object.".to_string()))?;
+    let model = body.remove("model").and_then(|model| model.as_str().map(str::to_owned));
+    let stream = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
+    body.entry("anthropic_version")
+        .or_insert_with(|| json!(crate::converter::openai_to_anthropic::ANTHROPIC_VERSION));
+    Ok((request, model, stream))
+}
+
+///
+/// Send a Messages request to Vertex AI and hand back its response as it is.
+///
+/// # Arguments
+///  * `state` - shared application state
+///  * `request` - Anthropic Messages request JSON
+///  * `headers` - request headers
+///
+/// # Returns
+///  * The upstream response
+///  * `ProxyError` if the request could not be sent
+async fn process_messages(
+    state: Arc<AppState>,
+    request: Value,
+    headers: &HeaderMap,
+) -> Result<axum::response::Response> {
+    if !matches!(state.config.llm_provider, Some(crate::provider::LlmProviderConfig::Vertex(_))) {
+        return Err(ProxyError::Config(
+            "/v1/messages needs the vertex provider (LLM_PROVIDER=vertex).".to_string(),
+        ));
+    }
+    let (body, model, stream) = prepare_messages_body(request)?;
+    let url = state.config.build_predict_url_for_model(model.as_deref(), stream);
+    let auth_header = get_authorization_header(state.clone()).await?;
+    let max_attempts =
+        if state.config.server.enable_retries { state.config.server.max_retry_attempts } else { 1 };
+
+    let mut attempts = 0;
+    let response = loop {
+        attempts += 1;
+        tracing::debug!("Passing a Messages request to Vertex AI: {}", url);
+        let mut upstream = state
+            .http_client
+            .post(&url)
+            .header(AUTHORIZATION_HEADER, &auth_header)
+            .header("Content-Type", CONTENT_TYPE_JSON)
+            .json(&body);
+        if let Some(beta) = headers.get("anthropic-beta") {
+            upstream = upstream.header("anthropic-beta", beta.as_bytes());
+        }
+        let response = upstream.send().await.map_err(ProxyError::Request)?;
+        if response.status().as_u16() == 429 && attempts < max_attempts {
+            state.metrics.quota_errors.fetch_add(1, Ordering::Relaxed);
+            state.metrics.retry_attempts.fetch_add(1, Ordering::Relaxed);
+            let delay_secs = BASE_RETRY_DELAY_SECS * 2_u64.pow(attempts - 1);
+            tracing::warn!(
+                "Rate limited, retrying in {} seconds (attempt {}/{})",
+                delay_secs,
+                attempts,
+                max_attempts
+            );
+            tokio::time::sleep(Duration::from_secs(delay_secs)).await;
+            continue;
+        }
+        break response;
+    };
+
+    let status = axum::http::StatusCode::from_u16(response.status().as_u16())
+        .unwrap_or(axum::http::StatusCode::BAD_GATEWAY);
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or(CONTENT_TYPE_JSON)
+        .to_string();
+    Response::builder()
+        .status(status)
+        .header("Content-Type", content_type)
+        .body(axum::body::Body::from_stream(response.bytes_stream()))
+        .map_err(|e| ProxyError::Http(format!("Failed to build the response: {}", e)))
 }
 
 ///
