@@ -5,6 +5,17 @@ All notable changes to ModelMux will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **No default temperature.** A request without `temperature` was sent to Vertex AI with
+  `temperature: 0.9`. Newer Claude models refuse the field ("`temperature` is deprecated for
+  this model"), so every such call failed. The field is now sent only when the caller set it,
+  and the model's own default applies otherwise.
+
+---
+
 ## [1.3.5] - 2026-07-13
 
 ### Added

@@ -229,8 +229,9 @@ pub struct AnthropicRequest {
     /** maximum tokens to generate */
     #[serde(rename = "max_tokens")]
     pub max_tokens: u32,
-    /** sampling temperature */
-    pub temperature: f64,
+    /** sampling temperature; left out when the caller sent none, so the model's own default applies */
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
     /** whether to stream the response */
     pub stream: bool,
     /** available tools in Anthropic format */
@@ -372,9 +373,6 @@ const ANTHROPIC_VERSION: &str = "vertex-2023-10-16";
 /** Default maximum tokens if not specified */
 const DEFAULT_MAX_TOKENS: u32 = 8000;
 
-/** Default temperature if not specified */
-const DEFAULT_TEMPERATURE: f64 = 0.9;
-
 /* --- start of code -------------------------------------------------------------------------- */
 
 impl OpenAiToAnthropicConverter {
@@ -437,7 +435,7 @@ impl OpenAiToAnthropicConverter {
             anthropic_version: ANTHROPIC_VERSION.to_string(),
             messages: anthropic_messages,
             max_tokens: request.max_tokens.unwrap_or(DEFAULT_MAX_TOKENS),
-            temperature: request.temperature.unwrap_or(DEFAULT_TEMPERATURE),
+            temperature: request.temperature,
             stream: request.stream.unwrap_or(false),
             tools,
             tool_choice,
