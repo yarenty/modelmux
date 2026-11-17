@@ -1,6 +1,7 @@
 //! Conversion of an OpenAI chat request into the Anthropic request sent to Vertex AI.
 
 use modelmux::config::LogLevel;
+use modelmux::converter::anthropic_to_openai::AnthropicResponse;
 use modelmux::converter::OpenAiToAnthropicConverter;
 use modelmux::converter::openai_to_anthropic::OpenAiRequest;
 use serde_json::{Value, json};
@@ -23,4 +24,17 @@ fn the_callers_temperature_is_passed_on() {
     let body =
         convert(json!({"temperature": 0.2, "messages": [{"role": "user", "content": "hi"}]}));
     assert_eq!(body["temperature"], json!(0.2));
+}
+
+#[test]
+fn a_response_with_a_block_other_than_text_or_tool_use_is_read() {
+    let response: AnthropicResponse = serde_json::from_value(json!({
+        "content": [
+            {"type": "thinking", "thinking": "", "signature": "abc"},
+            {"type": "text", "text": "ok"}
+        ],
+        "stop_reason": "end_turn"
+    }))
+    .expect("readable");
+    assert_eq!(response.content.len(), 2);
 }

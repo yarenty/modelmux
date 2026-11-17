@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `temperature: 0.9`. Newer Claude models refuse the field ("`temperature` is deprecated for
   this model"), so every such call failed. The field is now sent only when the caller set it,
   and the model's own default applies otherwise.
+- **Answers with other block types are read.** A non-streaming answer that held a block other
+  than `text` or `tool_use` (newer Claude models add `thinking` blocks) failed with "error
+  decoding response body". Such blocks are skipped.
 
 ---
 

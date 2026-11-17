@@ -59,6 +59,9 @@ pub enum AnthropicContentBlock {
         /** function input parameters */
         input: serde_json::Value,
     },
+    /** any other block (for example `thinking`); it has no OpenAI counterpart and is skipped */
+    #[serde(other)]
+    Other,
 }
 
 ///
